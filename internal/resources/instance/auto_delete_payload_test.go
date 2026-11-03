@@ -55,6 +55,11 @@ func TestCreateAutoDeleteAPIPayload(t *testing.T) {
 			wantJSON: `{"cloud":"verda","region":"helsinki-finland-1","shade_instance_type":"cpu_4","shade_cloud":true,"name":"payload-test","template_id":"template-test"}`,
 		},
 		{
+			name:       "template date override is sent in the original request",
+			autoDelete: payloadAutoDelete(types.StringValue("2030-01-02T15:04:05Z")), template: types.StringValue("template-test"),
+			wantJSON: `{"cloud":"verda","region":"helsinki-finland-1","shade_instance_type":"cpu_4","shade_cloud":true,"name":"payload-test","template_id":"template-test","auto_delete":{"date_threshold":"2030-01-02T15:04:05Z"}}`,
+		},
+		{
 			name:       "explicit template override is sent in the original request",
 			autoDelete: payloadAutoDelete(types.StringNull()), template: types.StringValue("template-test"),
 			wantJSON: `{"cloud":"verda","region":"helsinki-finland-1","shade_instance_type":"cpu_4","shade_cloud":true,"name":"payload-test","template_id":"template-test","auto_delete":{"date_threshold":null}}`,
@@ -73,9 +78,17 @@ func TestCreateAutoDeleteAPIPayload(t *testing.T) {
 			plan := payloadPlan(t, r, model)
 			resp := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}}
 			r.Create(context.Background(), resource.CreateRequest{Plan: plan}, &resp)
-			if len(resp.Diagnostics) != 1 || resp.Diagnostics[0].Summary() != "Error creating instance" ||
-				!strings.Contains(resp.Diagnostics[0].Detail(), "payload captured; creation intentionally rejected") {
+			errors := resp.Diagnostics.Errors()
+			if len(errors) != 1 || errors[0].Summary() != "Error creating instance" ||
+				!strings.Contains(errors[0].Detail(), "payload captured; creation intentionally rejected") {
 				t.Fatalf("expected the deliberate API rejection, got %v", resp.Diagnostics)
+			}
+			wantWarnings := 0
+			if !tc.template.IsNull() && !tc.autoDelete.IsNull() {
+				wantWarnings = 1
+			}
+			if len(resp.Diagnostics.Warnings()) != wantWarnings {
+				t.Fatalf("wanted %d template warnings, got %v", wantWarnings, resp.Diagnostics)
 			}
 		})
 	}

@@ -81,7 +81,11 @@ auto_delete = {
 
 While the object is configured, refresh detects date drift and the next apply restores the requested date or absence. Updating or clearing the date on an existing instance preserves its spend threshold and does not replace the instance. Unknown values must resolve before an API mutation; unknown is never treated as a clearing request.
 
-**Template creation has different merge behavior.** Live checks confirmed that omitting `auto_delete` inherits both the template date and spend threshold. Supplying a date or an explicit null date replaces the template's entire `auto_delete` object: the date takes effect, but the template's spend threshold is not inherited. This provider currently exposes only the date and does not copy the template spend threshold into the create request. Spend preservation on updates does not imply spend inheritance when overriding a template at creation.
+> **Warning: template spend protection is not inherited when overriding auto-delete at creation.** If you reference an externally created template with `template_id` and also supply `auto_delete`, Shadeform replaces the template's entire `auto_delete` object. For example, adding a deletion date to an instance created from a template with a $10 spend threshold gives the instance the date but no inherited $10 threshold. Using `auto_delete = { date_threshold = null }` or `auto_delete = {}` suppresses both inherited thresholds. The template itself is unchanged. This is also how Shadeform behaves when the same payload is sent directly to its API.
+
+Terraform/OpenTofu displays **"Template spend threshold will not be inherited"** during creation planning when both values are known, and during creation apply (including saved plans and values that resolve only at apply). This warning does not prevent creation. It is conditional on using both settings, without looking up whether the template actually contains a spend threshold. It is not emitted for updates to existing instances.
+
+Omit `auto_delete` (or set it to null) to inherit both template thresholds at creation. This provider exposes only the date and does not copy the template spend threshold into the create request. Date updates on an existing instance preserve its spend threshold.
 
 When using the date as provisioning protection, confirm that the **exact instance ID is present in durable Terraform/OpenTofu state** before applying a configuration that clears it. A successful provider response alone does not prove state persistence. The caller owns that orchestration.
 
@@ -122,4 +126,4 @@ Refresh removes instances from state when Shadeform returns HTTP 404 or reports 
 
 ### Nested schema for `auto_delete`
 
-- `date_threshold` (String, Optional) RFC3339 deletion date with a timezone and no fractional seconds. A null or omitted value inside a configured object explicitly clears the date. Changes are in place and preserve spend thresholds.
+- `date_threshold` (String, Optional) RFC3339 deletion date with a timezone and no fractional seconds. A null or omitted value inside a configured object explicitly clears the date. Changes are in place. Date updates on existing instances preserve spend thresholds; see the template creation warning above.

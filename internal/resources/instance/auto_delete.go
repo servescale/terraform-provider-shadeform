@@ -24,6 +24,16 @@ type autoDeleteModel struct {
 	DateThreshold types.String `tfsdk:"date_threshold"`
 }
 
+func templateAutoDeleteWarning(templateID types.String, autoDelete types.Object) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if templateID.IsNull() || templateID.IsUnknown() || autoDelete.IsNull() || autoDelete.IsUnknown() {
+		return diags
+	}
+	diags.AddAttributeWarning(path.Root("auto_delete"), "Template spend threshold will not be inherited",
+		"Creating an instance with both template_id and auto_delete replaces the template's entire auto_delete object in Shadeform. Any template spend_threshold will not be inherited, even when date_threshold is null or omitted inside the object. Omit auto_delete to inherit both template thresholds. Date updates on an existing instance preserve its spend threshold. This warning does not prevent creation.")
+	return diags
+}
+
 type autoDeleteDateValidator struct{}
 
 var _ validator.String = autoDeleteDateValidator{}

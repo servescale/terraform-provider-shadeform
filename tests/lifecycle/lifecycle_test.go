@@ -20,12 +20,14 @@ const dateA = "2030-01-02T15:04:05Z"
 const dateB = "2030-01-03T15:04:05Z"
 const dateOffset = "2030-01-03T17:04:05+02:00"
 
-func TestTerraformLifecycle(t *testing.T) {
+type cliEngine struct{ name, binary string }
+
+func lifecycleEngines(t *testing.T) []cliEngine {
+	t.Helper()
 	if os.Getenv("SHADEFORM_LIFECYCLE") != "1" {
 		t.Skip("set SHADEFORM_LIFECYCLE=1 to run local CLI lifecycle tests")
 	}
-	type engine struct{ name, binary string }
-	var engines []engine
+	var engines []cliEngine
 	for _, name := range []string{"terraform", "tofu"} {
 		binary := os.Getenv("SHADEFORM_LIFECYCLE_" + strings.ToUpper(name))
 		if binary == "" {
@@ -38,11 +40,16 @@ func TestTerraformLifecycle(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		engines = append(engines, engine{name, absolute})
+		engines = append(engines, cliEngine{name, absolute})
 	}
 	if len(engines) == 0 {
 		t.Fatal("provide Terraform or OpenTofu on PATH or through SHADEFORM_LIFECYCLE_TERRAFORM / SHADEFORM_LIFECYCLE_TOFU")
 	}
+	return engines
+}
+
+func TestTerraformLifecycle(t *testing.T) {
+	engines := lifecycleEngines(t)
 	fixtureDir := t.TempDir()
 	fixture := filepath.Join(fixtureDir, "terraform-provider-shadeform")
 	command(t, ".", nil, "go", "build", "-buildvcs=false", "-o", fixture, "./fixture")
@@ -132,13 +139,25 @@ func templateLifecycle(s *scenario, mode string) {
 		s.t.Fatalf("unknown template test mode %q", mode)
 	}
 	s.config(setting, "")
-	s.apply("create")
+	s.plan("create")
+	assertTemplateWarning := func(out string, want bool) {
+		s.t.Helper()
+		if got := strings.Contains(out, "Warning: Template spend threshold will not be inherited"); got != want {
+			s.t.Fatalf("template warning present=%v, want %v:\n%s", got, want, out)
+		}
+	}
+	assertTemplateWarning(s.lastPlanOutput, mode != "omit")
+	if s.remote().Creates != 0 {
+		s.t.Fatal("creation planning allocated an instance")
+	}
+	assertTemplateWarning(s.cli("apply", "-input=false", "-no-color", "plan.out"), mode != "omit")
 	s.assertState(mode != "omit", date, date)
 	s.assertRemote(date, spend)
 	if s.values()["template_id"] != "template-test" {
 		s.t.Fatal("template ID missing from persisted state")
 	}
 	s.noChanges()
+	assertTemplateWarning(s.lastPlanOutput, false)
 	remote := s.remote()
 	if remote.Creates != 1 || remote.Updates != 0 {
 		s.t.Fatal("template creation or unchanged apply issued an extra mutation")
@@ -146,6 +165,12 @@ func templateLifecycle(s *scenario, mode string) {
 	if !reflect.DeepEqual(remote.TemplateAutoDelete, map[string]interface{}{"date_threshold": dateA, "spend_threshold": "0.1"}) {
 		s.t.Fatal("instance override mutated the source template")
 	}
+	// An in-place date update does not have creation's inheritance behavior.
+	s.config("template_id = \"template-test\"\n"+managed(dateA), "")
+	s.plan("update")
+	assertTemplateWarning(s.lastPlanOutput, false)
+	assertTemplateWarning(s.cli("apply", "-input=false", "-no-color", "plan.out"), false)
+	s.assertRemote(dateA, spend)
 	s.destroy()
 }
 
@@ -257,8 +282,12 @@ func unknownLifecycle(s *scenario, wholeObject bool) {
 		setting = `auto_delete = terraform_data.deadline.output ? { date_threshold = "` + dateA + `" } : null`
 		extra = `resource "terraform_data" "deadline" { input = true }`
 	}
+	setting = "template_id = \"template-test\"\n" + setting
 	s.config(setting, extra)
 	change := s.plan("create")
+	if warned := strings.Contains(s.lastPlanOutput, "Warning: Template spend threshold will not be inherited"); warned == wholeObject {
+		s.t.Fatalf("unexpected warning for unknown configuration:\n%s", s.lastPlanOutput)
+	}
 	unknown := change.AfterUnknown["auto_delete"]
 	if wholeObject {
 		if unknown != true {
@@ -273,7 +302,9 @@ func unknownLifecycle(s *scenario, wholeObject bool) {
 	if s.remote().Creates != 0 {
 		s.t.Fatal("planning unknown configuration made an API mutation")
 	}
-	s.cli("apply", "-input=false", "-no-color", "plan.out")
+	if out := s.cli("apply", "-input=false", "-no-color", "plan.out"); !strings.Contains(out, "Warning: Template spend threshold will not be inherited") {
+		s.t.Fatalf("creation with resolved values did not warn:\n%s", out)
+	}
 	s.assertState(true, dateA, dateA)
 	s.assertRemote(dateA, nil)
 	s.noChanges()
@@ -312,6 +343,7 @@ type scenario struct {
 	t                 *testing.T
 	engine, dir, file string
 	env               []string
+	lastPlanOutput    string
 }
 type change struct {
 	Actions      []string               `json:"actions"`
@@ -325,13 +357,18 @@ func newScenario(t *testing.T, engine, fixtureDir string) *scenario {
 	if err := mockapi.Save(s.file, mockapi.State{}); err != nil {
 		t.Fatal(err)
 	}
-	config := fmt.Sprintf("provider_installation {\n dev_overrides {\n  \"registry.terraform.io/shadeform/shadeform\" = %q\n }\n direct { exclude = [\"registry.terraform.io/shadeform/shadeform\"] }\n}\n", fixtureDir)
 	cliConfig := filepath.Join(dir, "test.tfrc")
-	if err := os.WriteFile(cliConfig, []byte(config), 0600); err != nil {
-		t.Fatal(err)
-	}
+	s.useProvider(fixtureDir)
 	s.env = append(cleanEnv(), "TF_CLI_CONFIG_FILE="+cliConfig, "SHADEFORM_LIFECYCLE_STATE="+s.file)
 	return s
+}
+
+func (s *scenario) useProvider(fixtureDir string) {
+	s.t.Helper()
+	config := fmt.Sprintf("provider_installation {\n dev_overrides {\n  \"registry.terraform.io/shadeform/shadeform\" = %q\n }\n direct { exclude = [\"registry.terraform.io/shadeform/shadeform\"] }\n}\n", fixtureDir)
+	if err := os.WriteFile(filepath.Join(s.dir, "test.tfrc"), []byte(config), 0600); err != nil {
+		s.t.Fatal(err)
+	}
 }
 
 func managed(date string) string { return fmt.Sprintf("auto_delete = { date_threshold = %q }", date) }
@@ -364,7 +401,7 @@ func (s *scenario) cli(args ...string) string {
 }
 func (s *scenario) plan(actions ...string) change {
 	s.t.Helper()
-	s.cli("plan", "-input=false", "-no-color", "-out=plan.out")
+	s.lastPlanOutput = s.cli("plan", "-input=false", "-no-color", "-out=plan.out")
 	var document struct {
 		ResourceChanges []struct {
 			Address string `json:"address"`

@@ -21,6 +21,7 @@ var (
 	_ resource.Resource                = &InstanceResource{}
 	_ resource.ResourceWithConfigure   = &InstanceResource{}
 	_ resource.ResourceWithImportState = &InstanceResource{}
+	_ resource.ResourceWithModifyPlan  = &InstanceResource{}
 )
 
 type InstanceResource struct {
@@ -103,11 +104,11 @@ func (r *InstanceResource) Schema(ctx context.Context, _ resource.SchemaRequest,
 				Optional:    true,
 			},
 			"auto_delete": schema.SingleNestedAttribute{
-				Description: "Manage only the automatic deletion date. Omit this object (or set it to null) to leave the remote date unchanged. A present object with a null or omitted date_threshold explicitly clears the date and maintains its absence. Removing this object stops management without clearing the date. Spend thresholds are preserved.",
+				Description: "Manage only the automatic deletion date. Omit this object (or set it to null) to leave the remote date unchanged. A present object with a null or omitted date_threshold explicitly clears the date and maintains its absence. Removing this object stops management without clearing the date. Date updates on existing instances preserve spend thresholds. At creation, supplying this object overrides the template's entire auto_delete object, so its spend threshold is not inherited.",
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"date_threshold": schema.StringAttribute{
-						Description: "Automatic deletion deadline as an RFC3339 timestamp with a timezone and no fractional seconds. Null explicitly clears only the date. Changes do not replace the instance.",
+						Description: "Automatic deletion deadline as an RFC3339 timestamp with a timezone and no fractional seconds. On existing instances, null explicitly clears only the date. At creation, supplying auto_delete overrides the template's deletion settings. Changes do not replace the instance.",
 						Optional:    true,
 						Validators:  []validator.String{autoDeleteDateValidator{}},
 					},
@@ -165,6 +166,19 @@ func (r *InstanceResource) Schema(ctx context.Context, _ resource.SchemaRequest,
 			}),
 		},
 	}
+}
+
+// Warn before creation so callers can see the template override in their plan.
+func (r *InstanceResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || !req.State.Raw.IsNull() {
+		return
+	}
+	var plan InstanceResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(templateAutoDeleteWarning(plan.TemplateId, plan.AutoDelete)...)
 }
 
 // Configure adds the provider configured client to the resource.
@@ -240,6 +254,8 @@ func (r *InstanceResource) Create(ctx context.Context, req resource.CreateReques
 	if !plan.AutoDelete.IsNull() {
 		requestBody["auto_delete"] = autoDeletePayload(date)
 	}
+	// Also warn when applying a saved plan or values that resolved only at apply.
+	resp.Diagnostics.Append(templateAutoDeleteWarning(plan.TemplateId, plan.AutoDelete)...)
 
 	// Include auto_delete in this original request, never in a post-create update.
 	// Create instance
