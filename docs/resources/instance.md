@@ -35,7 +35,7 @@ resource "shadeform_instance" "test-instance" {
 
 ## Automatic deletion
 
-This feature is implemented on the `issue-3-expose-auto-delete` development branch; a released provider version containing it has not been published yet.
+Use `auto_delete.date_threshold` to manage an instance's automatic deletion date.
 
 Set a stable, whole-second RFC3339 deadline in the resource configuration:
 
