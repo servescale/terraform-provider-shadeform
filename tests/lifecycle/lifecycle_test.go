@@ -60,10 +60,54 @@ func TestTerraformLifecycle(t *testing.T) {
 				"validation":                  validationLifecycle,
 				"deleted_status":              func(s *scenario) { deletedLifecycle(s, false) },
 				"not_found":                   func(s *scenario) { deletedLifecycle(s, true) },
+				"failure_poll_http":           func(s *scenario) { failureLifecycle(s, "poll_http", false, "Instance not ready", 1, false) },
+				"failure_poll_error":          func(s *scenario) { failureLifecycle(s, "poll_error", false, "Instance not ready", 1, false) },
+				"failure_final_read": func(s *scenario) {
+					failureLifecycle(s, "final_http", false, "Error reading instance after create", 2, false)
+				},
+				"failure_timeout_cleanup": func(s *scenario) {
+					failureLifecycle(s, "delete_http", true, "Instance creation failed and cleanup failed", 0, false)
+				},
+				"timeout_cleanup_succeeds": func(s *scenario) { failureLifecycle(s, "", true, "Instance creation timed out", 0, true) },
 			} {
 				t.Run(name, func(t *testing.T) { t.Parallel(); exercise(newScenario(t, e.binary, fixtureDir)) })
 			}
 		})
+	}
+}
+
+// Check the service-side allocation after a real failed CLI apply. Early state
+// persistence and recovery belong to issue #4, not this deadline invariant.
+func failureLifecycle(s *scenario, fault string, timeout bool, diagnostic string, wantReads int, deleted bool) {
+	s.edit(func(remote *mockapi.State) { remote.Failure = fault })
+	setting := managed(dateA)
+	wantDeletes := 0
+	if timeout {
+		setting += "\ntimeouts { create = \"1ms\" }"
+		wantDeletes = 1
+	}
+	s.config(setting, "")
+	s.plan("create")
+	out, err := output(s.dir, s.env, s.engine, "apply", "-input=false", "-no-color", "plan.out")
+	if err == nil || !strings.Contains(out, "Error: "+diagnostic) {
+		s.t.Fatalf("expected failed apply with %q: %v\n%s", diagnostic, err, out)
+	}
+	remote := s.remote()
+	if remote.Creates != 1 || remote.Reads != wantReads || remote.Updates != 0 || remote.Deletes != wantDeletes {
+		s.t.Fatalf("unexpected operations after failed apply: creates=%d reads=%d updates=%d deletes=%d", remote.Creates, remote.Reads, remote.Updates, remote.Deletes)
+	}
+	if !reflect.DeepEqual(remote.CreatedAutoDelete, map[string]interface{}{"date_threshold": dateA}) {
+		s.t.Fatalf("original create did not contain the exact deadline: %#v", remote.CreatedAutoDelete)
+	}
+	if deleted {
+		if remote.Instance != nil {
+			s.t.Fatal("successful timeout cleanup left an allocation")
+		}
+	} else {
+		if remote.Instance == nil || remote.Instance["id"] != "allocated-1" {
+			s.t.Fatal("expected the original allocation to survive the failure")
+		}
+		s.assertRemote(dateA, nil)
 	}
 }
 

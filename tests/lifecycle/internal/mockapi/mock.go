@@ -17,6 +17,10 @@ type State struct {
 	Updates  int                    `json:"updates"`
 	Deletes  int                    `json:"deletes"`
 	NotFound bool                   `json:"not_found"`
+	// Failure injection and the original payload survive provider restarts.
+	Failure           string                 `json:"failure,omitempty"`
+	Reads             int                    `json:"reads"`
+	CreatedAutoDelete map[string]interface{} `json:"created_auto_delete,omitempty"`
 }
 
 func Load(file string) (State, error) {
@@ -62,6 +66,13 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			return nil, fmt.Errorf("unexpected replacement of an existing fixture instance")
 		}
 		state.Creates++
+		state.Reads = 0
+		if autoDelete, ok := body["auto_delete"].(map[string]interface{}); ok {
+			state.CreatedAutoDelete = make(map[string]interface{}, len(autoDelete))
+			for key, value := range autoDelete {
+				state.CreatedAutoDelete[key] = value
+			}
+		}
 		state.NotFound = false
 		state.Instance = NewInstance(fmt.Sprintf("allocated-%d", state.Creates), body["name"].(string), nil)
 		for key, value := range body {
@@ -69,9 +80,16 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 		result = map[string]interface{}{"id": state.Instance["id"], "status": "creating"}
 	case req.Method == http.MethodGet && state.Instance != nil && req.URL.Path == "/v1/instances/"+state.Instance["id"].(string)+"/info":
-		if state.NotFound {
+		state.Reads++
+		switch {
+		case state.NotFound:
 			code = http.StatusNotFound
-		} else {
+		case state.Failure == "poll_http", state.Failure == "final_http" && state.Reads == 2:
+			code = http.StatusServiceUnavailable
+			result = map[string]interface{}{"error": "fixture read failure"}
+		case state.Failure == "poll_error":
+			result = map[string]interface{}{"status": "error"}
+		default:
 			result = state.Instance
 		}
 	case req.Method == http.MethodPost && state.Instance != nil && req.URL.Path == "/v1/instances/"+state.Instance["id"].(string)+"/update":
@@ -104,7 +122,12 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	case req.Method == http.MethodPost && state.Instance != nil && req.URL.Path == "/v1/instances/"+state.Instance["id"].(string)+"/delete":
 		state.Deletes++
-		state.Instance = nil
+		if state.Failure == "delete_http" {
+			code = http.StatusServiceUnavailable
+			result = map[string]interface{}{"error": "fixture cleanup failure"}
+		} else {
+			state.Instance = nil
+		}
 	case req.Method == http.MethodGet:
 		code = http.StatusNotFound
 	default:
