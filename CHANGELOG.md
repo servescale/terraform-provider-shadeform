@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Optional instance `auto_delete.date_threshold` management: set a date at creation, update it in place, or explicitly clear it while preserving spend thresholds. Omitting the object leaves the remote date unchanged.
+- Optional instance `auto_delete.date_threshold` management: set a date at creation, update it in place, or explicitly clear it. Date updates on an existing instance preserve spend thresholds. At creation, supplying the object overrides the template's whole auto-delete object, including its inherited spend threshold. Omitting the object leaves remote dates unchanged and inherits template thresholds at creation.
 - Read-only `effective_auto_delete_date_threshold` for inspecting managed and unmanaged dates.
 
 ### Fixed

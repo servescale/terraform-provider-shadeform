@@ -18,9 +18,10 @@ type State struct {
 	Deletes  int                    `json:"deletes"`
 	NotFound bool                   `json:"not_found"`
 	// Failure injection and the original payload survive provider restarts.
-	Failure           string                 `json:"failure,omitempty"`
-	Reads             int                    `json:"reads"`
-	CreatedAutoDelete map[string]interface{} `json:"created_auto_delete,omitempty"`
+	Failure            string                 `json:"failure,omitempty"`
+	Reads              int                    `json:"reads"`
+	CreatedAutoDelete  map[string]interface{} `json:"created_auto_delete,omitempty"`
+	TemplateAutoDelete map[string]interface{} `json:"template_auto_delete,omitempty"`
 }
 
 func Load(file string) (State, error) {
@@ -77,6 +78,25 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		state.Instance = NewInstance(fmt.Sprintf("allocated-%d", state.Creates), body["name"].(string), nil)
 		for key, value := range body {
 			state.Instance[key] = value
+		}
+		// Live template creation inherits the whole object only when omitted.
+		// A supplied date/null object replaces it, unlike update's field merge.
+		if _, supplied := body["auto_delete"]; !supplied && body["template_id"] == "template-test" && state.TemplateAutoDelete != nil {
+			inherited := make(map[string]interface{}, len(state.TemplateAutoDelete))
+			for key, value := range state.TemplateAutoDelete {
+				inherited[key] = value
+			}
+			state.Instance["auto_delete"] = inherited
+		}
+		if autoDelete, ok := state.Instance["auto_delete"].(map[string]interface{}); ok {
+			for key, value := range autoDelete {
+				if value == nil {
+					delete(autoDelete, key)
+				}
+			}
+			if len(autoDelete) == 0 {
+				delete(state.Instance, "auto_delete")
+			}
 		}
 		result = map[string]interface{}{"id": state.Instance["id"], "status": "creating"}
 	case req.Method == http.MethodGet && state.Instance != nil && req.URL.Path == "/v1/instances/"+state.Instance["id"].(string)+"/info":

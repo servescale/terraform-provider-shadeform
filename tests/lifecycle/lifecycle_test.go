@@ -60,6 +60,9 @@ func TestTerraformLifecycle(t *testing.T) {
 				"validation":                  validationLifecycle,
 				"deleted_status":              func(s *scenario) { deletedLifecycle(s, false) },
 				"not_found":                   func(s *scenario) { deletedLifecycle(s, true) },
+				"template_omitted":            func(s *scenario) { templateLifecycle(s, "omit") },
+				"template_explicit_clear":     func(s *scenario) { templateLifecycle(s, "clear") },
+				"template_date_override":      func(s *scenario) { templateLifecycle(s, "override") },
 				"failure_poll_http":           func(s *scenario) { failureLifecycle(s, "poll_http", false, "Instance not ready", 1, false) },
 				"failure_poll_error":          func(s *scenario) { failureLifecycle(s, "poll_error", false, "Instance not ready", 1, false) },
 				"failure_final_read": func(s *scenario) {
@@ -109,6 +112,41 @@ func failureLifecycle(s *scenario, fault string, timeout bool, diagnostic string
 		}
 		s.assertRemote(dateA, nil)
 	}
+}
+
+func templateLifecycle(s *scenario, mode string) {
+	s.edit(func(remote *mockapi.State) {
+		remote.TemplateAutoDelete = map[string]interface{}{"date_threshold": dateA, "spend_threshold": "0.1"}
+	})
+	setting := "template_id = \"template-test\"\n"
+	var date, spend interface{}
+	switch mode {
+	case "omit":
+		date, spend = dateA, "0.1"
+	case "clear":
+		setting += `auto_delete = { date_threshold = null }`
+	case "override":
+		setting += managed(dateB)
+		date = dateB
+	default:
+		s.t.Fatalf("unknown template test mode %q", mode)
+	}
+	s.config(setting, "")
+	s.apply("create")
+	s.assertState(mode != "omit", date, date)
+	s.assertRemote(date, spend)
+	if s.values()["template_id"] != "template-test" {
+		s.t.Fatal("template ID missing from persisted state")
+	}
+	s.noChanges()
+	remote := s.remote()
+	if remote.Creates != 1 || remote.Updates != 0 {
+		s.t.Fatal("template creation or unchanged apply issued an extra mutation")
+	}
+	if !reflect.DeepEqual(remote.TemplateAutoDelete, map[string]interface{}{"date_threshold": dateA, "spend_threshold": "0.1"}) {
+		s.t.Fatal("instance override mutated the source template")
+	}
+	s.destroy()
 }
 
 func manageLifecycle(s *scenario) {

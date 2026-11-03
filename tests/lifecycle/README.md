@@ -25,7 +25,7 @@ The test builds a provider executable in a temporary directory and uses a privat
 
 ## Coverage
 
-Fourteen scenarios run per CLI:
+Seventeen scenarios run per CLI:
 
 1. Create with a date, change it in place, change timezone spelling, reconcile managed drift, explicitly clear, repeat apply, use an empty object, stop management, observe unmanaged drift, and destroy.
 2. Import an instance with a date and spend threshold without adopting management, then explicitly clear only its date and destroy.
@@ -41,9 +41,14 @@ Fourteen scenarios run per CLI:
 12. Preserve the original deadline when the final read fails after readiness succeeds.
 13. Preserve the original deadline when creation times out and cleanup fails.
 14. Remove the allocation when creation times out and cleanup succeeds.
+15. Inherit a template date and spend threshold when `auto_delete` is omitted, without adopting date management.
+16. Explicitly clear a template date at creation and verify the template spend threshold is not inherited.
+17. Override a template date at creation and verify the template spend threshold is not inherited.
 
 Assertions inspect saved JSON plans, persisted state, remote fixture settings, instance IDs, and API mutation counts. Unchanged applies must have a `no-op` instance plan and make no API mutations; date changes must use `update`, with no replacement. Spend thresholds survive date updates and clearing.
 
 Failure scenarios require a failed CLI apply with the expected diagnostic, the date in the original create payload, exactly one allocation attempt, no update requests, and the expected read/cleanup counts. Every surviving allocation must retain its deadline. The fixture stores its allocation and request counters independently of Terraform state so failed applies cannot hide a surviving instance.
 
-The fixture models the merge/null behavior observed in the earlier live API verification. These tests establish provider/CLI behavior against that fixture; they do not establish real service template inheritance, deadline execution, or early identity persistence/recovery (issue #4). Those remain separate validation steps. The sibling API payload tests check exact serialized request bodies independently. `internal/resources/instance/auto_delete_failure_test.go` additionally covers lost/malformed create responses after allocation, cancellation, malformed responses and transport errors during polling/readback, mismatched readback, invalid timeout parsing, and a successful-create control.
+The fixture models the merge/null behavior observed in live API verification, including template creation's whole-object override versus update's field-level merge. Template cases also check persisted state, clean subsequent plans, no post-create updates, and an unchanged source template. They characterize the current loss of template spend inheritance when a date override is supplied; they do not establish that this limitation meets a future spend-preservation requirement.
+
+These tests establish provider/CLI behavior against a fixture. Separate live API probes established the modeled template behavior; these CLI tests themselves make no live calls. Deadline execution and early identity persistence/recovery (issue #4) remain separate validation steps. The sibling API payload tests check exact serialized request bodies independently. `internal/resources/instance/auto_delete_failure_test.go` additionally covers lost/malformed create responses after allocation, cancellation, malformed responses and transport errors during polling/readback, mismatched readback, invalid timeout parsing, and a successful-create control.

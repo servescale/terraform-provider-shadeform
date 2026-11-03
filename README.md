@@ -92,6 +92,8 @@ The `issue-3-expose-auto-delete` development branch adds optional `auto_delete.d
 
 Use `effective_auto_delete_date_threshold` to inspect the current remote date, including dates inherited from templates or found on import. See the [instance documentation](docs/resources/instance.md#automatic-deletion) for examples, timestamp requirements, and the durable-state check callers must perform before clearing provisioning protection. This capability is not yet available in a published provider release.
 
+At creation, supplying `auto_delete` replaces the template's whole auto-delete object: setting or clearing its date also prevents inheritance of the template's spend threshold. Omitting the object inherits both thresholds. This differs from date updates on an existing instance, which preserve its spend threshold.
+
 ## Requirements
 
 | Name | Version |

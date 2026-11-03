@@ -79,11 +79,13 @@ auto_delete = {
 
 **Removing the entire object stops management; it does not clear the deadline.** Imported instances and instances with template-provided dates are unmanaged until an object is configured. Refresh still reports their dates in `effective_auto_delete_date_threshold` without adopting them into configuration. This output is null when no date is set, including when a spend threshold alone is present.
 
-While the object is configured, refresh detects date drift and the next apply restores the requested date or absence. Date updates and clearing preserve any spend threshold, and do not replace the instance. Unknown values must resolve before an API mutation; unknown is never treated as a clearing request.
+While the object is configured, refresh detects date drift and the next apply restores the requested date or absence. Updating or clearing the date on an existing instance preserves its spend threshold and does not replace the instance. Unknown values must resolve before an API mutation; unknown is never treated as a clearing request.
+
+**Template creation has different merge behavior.** Live checks confirmed that omitting `auto_delete` inherits both the template date and spend threshold. Supplying a date or an explicit null date replaces the template's entire `auto_delete` object: the date takes effect, but the template's spend threshold is not inherited. This provider currently exposes only the date and does not copy the template spend threshold into the create request. Spend preservation on updates does not imply spend inheritance when overriding a template at creation.
 
 When using the date as provisioning protection, confirm that the **exact instance ID is present in durable Terraform/OpenTofu state** before applying a configuration that clears it. A successful provider response alone does not prove state persistence. The caller owns that orchestration.
 
-The provider verifies the requested date against readback after create/update. If a template or the service prevents the requested date or absence from taking effect, apply returns an error identifying the instance; Create does not issue a follow-up clearing request. Explicit-null overrides of template dates during creation still need integration validation.
+The provider verifies the requested date against readback after create/update. If a template or the service prevents the requested date or absence from taking effect, apply returns an error identifying the instance; Create does not issue a follow-up clearing request.
 
 Refresh removes instances from state when Shadeform returns HTTP 404 or reports `status: deleted`. A later apply may then create a new instance if its resource remains configured.
 
