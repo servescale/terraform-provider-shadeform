@@ -86,6 +86,12 @@ resource "shadeform_volume" "test-volume" {
 > **_NOTE:_** Instances can take anywhere from 1 - 15 minutes on average to spin up with some evening taking upwards of 30-40 minutes.
 The `terraform apply` command won't finish until the instances are active (or errored out). There is a default timeout of 60 minutes.
 
+## Automatic deletion (unreleased)
+
+The `issue-3-expose-auto-delete` development branch adds optional `auto_delete.date_threshold` management to `shadeform_instance`. A configured date is included in the original create request and can be updated in place. A present object with `date_threshold = null` explicitly clears only the date; omitting the entire object leaves the remote date unchanged. Spend thresholds are preserved on updates.
+
+Use `effective_auto_delete_date_threshold` to inspect the current remote date, including dates inherited from templates or found on import. See the [instance documentation](docs/resources/instance.md#automatic-deletion) for examples, timestamp requirements, and the durable-state check callers must perform before clearing provisioning protection. This capability is not yet available in a published provider release.
+
 ## Requirements
 
 | Name | Version |
@@ -113,4 +119,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history. 
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history.

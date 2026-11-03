@@ -3,6 +3,7 @@ package provider_shadeform
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,6 +33,22 @@ const (
 type Client struct {
 	apiKey     string
 	httpClient *http.Client
+}
+
+// APIError retains the response status so resources can distinguish an instance
+// that has disappeared (including automatic deletion) from a failed refresh.
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("API request failed with status %d: %s", e.StatusCode, e.Body)
+}
+
+func IsNotFound(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
 func NewClient(apiKey string) *Client {
@@ -124,7 +141,7 @@ func (c *Client) makeRequest(method, path string, body interface{}, expectRespon
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(respBody))
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(respBody)}
 	}
 
 	// If we don't expect a response (like for delete operations), return early

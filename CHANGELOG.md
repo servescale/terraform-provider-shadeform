@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Optional instance `auto_delete.date_threshold` management: set a date at creation, update it in place, or explicitly clear it while preserving spend thresholds. Omitting the object leaves the remote date unchanged.
+- Read-only `effective_auto_delete_date_threshold` for inspecting managed and unmanaged dates.
+
+### Fixed
+
+- Refresh recognizes instances deleted automatically or externally through HTTP 404 or `status: deleted`.
+- Instance updates populate computed fields from readback instead of leaving them unknown. Numeric SSH ports and hourly prices are decoded from JSON responses.
+
 ## v0.1.0
 
 ### Added
