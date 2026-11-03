@@ -52,15 +52,22 @@ func IsNotFound(err error) bool {
 }
 
 func NewClient(apiKey string) *Client {
+	return NewClientWithHTTPClient(apiKey, nil)
+}
+
+// NewClientWithHTTPClient allows callers to supply an HTTP transport, including
+// an in-memory transport for tests. A nil client uses the default timeout.
+func NewClientWithHTTPClient(apiKey string, httpClient *http.Client) *Client {
 	if apiKey == "" {
 		apiKey = os.Getenv("SHADEFORM_API_KEY")
 	}
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	}
 
 	return &Client{
-		apiKey: apiKey,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		apiKey:     apiKey,
+		httpClient: httpClient,
 	}
 }
 
