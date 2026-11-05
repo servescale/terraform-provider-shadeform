@@ -1,26 +1,32 @@
-# Terraform Provider for Shadeform
+# ServeScale Shadeform Provider
 
-[![Terraform Registry](https://img.shields.io/badge/terraform-registry-blue.svg)](https://registry.terraform.io/providers/shadeform/shadeform)
+[![Distribution: pending](https://img.shields.io/badge/OpenTofu_distribution-pending-orange.svg)](docs/releases.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Terraform provider for managing GPU instances and storage volumes on Shadeform, a unified platform for deploying and managing cloud GPUs across multiple cloud providers. For more information about what Shadeform is and how to use it, visit our [public docs](https://docs.shadeform.ai/getting-started/introduction).
+A Terraform/OpenTofu provider for managing GPU instances and storage volumes on Shadeform, a unified platform for deploying and managing cloud GPUs across multiple cloud providers. For more information about Shadeform, visit the [Shadeform public docs](https://docs.shadeform.ai/getting-started/introduction).
+
+This is an independently maintained ServeScale fork for OpenTofu, based on upstream [v0.1.3](https://github.com/shadeform/terraform-provider-shadeform/tree/v0.1.3) (`c5e5295741be0c0859dee5e3a51dd14b6ea61717`). Its provider address is `registry.opentofu.org/servescale/shadeform`. Fork versions follow independent SemVer; matching an upstream version does not imply identical code or compatibility. Upstream contribution remains an option; this fork has no planned retirement date.
+
+**Distribution is pending.** The proposed first fork release is `v0.2.0`; the configuration below becomes installable only after signed release artifacts are published and OpenTofu registry registration is approved. See the [release and distribution checklist](docs/releases.md). The release and migration requirements in [issue #3](https://github.com/servescale/terraform-provider-shadeform/issues/3) remain outstanding.
 
 ## Quick Start
 
 ### Installation
 
-Add the provider to your Terraform configuration:
+After publication, add the provider to your OpenTofu configuration:
 
 ```hcl
 terraform {
   required_providers {
     shadeform = {
-      source  = "shadeform/shadeform"
-      version = "~> 0.1.0"
+      source  = "servescale/shadeform"
+      version = "~> 0.2.0"
     }
   }
 }
 ```
+
+OpenTofu resolves this shorthand to `registry.opentofu.org/servescale/shadeform`. Use the full address in configurations shared with Terraform, whose default registry differs. HashiCorp registry publication is not part of this fork's release contract. Existing upstream state requires provider-address migration; changing only this block is insufficient. Migration documentation and coverage remain outstanding in PR #6's second review finding.
 
 ### Configuration
 
@@ -43,20 +49,20 @@ If you do that, make sure to set the `api_key` to `""`
 #### Commands
 
 ```bash
-# Initialize Terraform
-terraform init
+# Initialize OpenTofu after publication
+tofu init
 
 # Plan the changes
-terraform plan
+tofu plan
 
 # Apply the changes
-terraform apply
+tofu apply
 
 # Check the state
-terraform show
+tofu show
 
 # Destroy the resources
-terraform destroy
+tofu destroy
 ```
 
 ### Basic Usage
@@ -99,7 +105,7 @@ At creation, supplying `auto_delete` replaces the template's whole auto-delete o
 | Name | Version |
 |------|---------|
 | terraform | >= 1.0 |
-| go | >= 1.21 |
+| go (building from source) | >= 1.25 |
 
 ## Contributing
 
@@ -116,8 +122,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 - **Documentation**: [Shadeform API Documentation](https://docs.shadeform.ai)
-- **Issues**: [GitHub Issues](https://github.com/shadeform/terraform-provider-shadeform/issues)
-- **Email**: support@shadeform.ai
+- **Fork bugs, releases, and support**: [ServeScale GitHub Issues](https://github.com/servescale/terraform-provider-shadeform/issues)
+- **Upstream provider**: [Shadeform repository](https://github.com/shadeform/terraform-provider-shadeform)
 
 ## Changelog
 

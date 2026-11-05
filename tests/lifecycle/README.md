@@ -19,7 +19,9 @@ SHADEFORM_LIFECYCLE_TOFU=/absolute/path/to/tofu \
 go test -buildvcs=false ./tests/lifecycle -v -count=1
 ```
 
-Without `SHADEFORM_LIFECYCLE=1`, the suite is skipped. When enabled, having no available CLI is an error. Explicit executable paths must exist. Versions are logged; the suite has passed with Terraform 1.14.4 and OpenTofu 1.13.1 on Linux amd64.
+Without `SHADEFORM_LIFECYCLE=1`, the suite is skipped. When enabled, having no available CLI is an error. Explicit executable paths must exist. Versions are logged. All 22 scenarios passed with OpenTofu 1.13.5 on Linux amd64 after introducing the fork identity. Historical runs before the identity change passed with Terraform 1.14.4 and OpenTofu 1.13.1; Terraform has not been rerun with the fork identity.
+
+Current lifecycle scenarios use the fork address `registry.opentofu.org/servescale/shadeform` explicitly in HCL, CLI overrides, and the fixture entrypoint.
 
 The test builds a provider executable in a temporary directory and uses a private CLI configuration with a development override. It does not run `init` or change the user's CLI configuration. Local plugin IPC must be allowed; a restricted sandbox can block the plugin handshake even though the fixture makes no external API requests. The production readiness polling interval is unchanged, so creation scenarios take at least 15 seconds. Independent scenarios run in parallel.
 
@@ -66,6 +68,8 @@ These tests establish provider/CLI behavior against a fixture. Separate live API
 ## Legacy state compatibility
 
 Five additional scenarios run per CLI using state actually written by the pinned old provider: no remote thresholds, date only, spend only, both thresholds, and an imported instance with both thresholds. Created-instance cases add external thresholds to the fixture after creation, then refresh with the old provider before upgrading.
+
+These schema checks deliberately retain `registry.terraform.io/shadeform/shadeform` in HCL and CLI overrides. The current fixture is built with that historical address for this suite only; the legacy fixture retains the original address. They do not test migration to the fork address.
 
 The test verifies that the old raw state contains neither new field, then switches only the provider executable. It requires a clean plan with refresh disabled, successful refresh-only apply, and a clean normal plan/apply. The resulting state must retain its lineage, schema version, instance ID, and existing configuration fields. `auto_delete` must be null (unmanaged), while `effective_auto_delete_date_threshold` reflects the remote date or null. Upgrade performs no API mutations.
 

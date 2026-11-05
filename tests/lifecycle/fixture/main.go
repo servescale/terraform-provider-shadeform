@@ -20,6 +20,9 @@ type fixtureProvider struct {
 	file string
 }
 
+// The legacy schema checks override this at build time to retain the old address.
+var providerAddress = "registry.opentofu.org/servescale/shadeform"
+
 func (p fixtureProvider) Configure(ctx context.Context, req framework.ConfigureRequest, resp *framework.ConfigureResponse) {
 	p.Provider.Configure(ctx, req, resp)
 	if resp.Diagnostics.HasError() {
@@ -37,7 +40,7 @@ func main() {
 	}
 	err := providerserver.Serve(context.Background(), func() framework.Provider {
 		return fixtureProvider{Provider: provider.New("lifecycle-test")(), file: file}
-	}, providerserver.ServeOpts{Address: "registry.terraform.io/shadeform/shadeform"})
+	}, providerserver.ServeOpts{Address: providerAddress})
 	if err != nil {
 		log.Fatal(err)
 	}

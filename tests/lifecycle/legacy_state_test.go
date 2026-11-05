@@ -13,12 +13,13 @@ import (
 // Pin the actual main revision from which issue #3 branched. Never manufacture
 // old state by deleting fields from state written by the new provider.
 const legacyRevision = "3c30a04ad5774aa586bb9f76b82c64995ace86ff"
+const legacyProviderAddress = "registry.terraform.io/shadeform/shadeform"
 
 func TestTerraformLegacyState(t *testing.T) {
 	engines := lifecycleEngines(t)
 	legacyDir := buildLegacyProvider(t)
 	currentDir := t.TempDir()
-	command(t, ".", nil, "go", "build", "-buildvcs=false", "-o", filepath.Join(currentDir, "terraform-provider-shadeform"), "./fixture")
+	command(t, ".", nil, "go", "build", "-buildvcs=false", "-ldflags", "-X main.providerAddress="+legacyProviderAddress, "-o", filepath.Join(currentDir, "terraform-provider-shadeform"), "./fixture")
 	for _, engine := range engines {
 		t.Run(engine.name, func(t *testing.T) {
 			t.Parallel()
@@ -36,7 +37,7 @@ func TestTerraformLegacyState(t *testing.T) {
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					t.Parallel()
-					s := newScenario(t, engine.binary, legacyDir)
+					s := newScenario(t, engine.binary, legacyDir, legacyProviderAddress)
 					s.config("", "")
 					if tc.imported {
 						s.seed(dateA)

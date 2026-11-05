@@ -16,6 +16,7 @@ import (
 )
 
 const address = "shadeform_instance.test"
+const forkProviderAddress = "registry.opentofu.org/servescale/shadeform"
 const dateA = "2030-01-02T15:04:05Z"
 const dateB = "2030-01-03T15:04:05Z"
 const dateOffset = "2030-01-03T17:04:05+02:00"
@@ -80,7 +81,7 @@ func TestTerraformLifecycle(t *testing.T) {
 				},
 				"timeout_cleanup_succeeds": func(s *scenario) { failureLifecycle(s, "", true, "Instance creation timed out", 0, true) },
 			} {
-				t.Run(name, func(t *testing.T) { t.Parallel(); exercise(newScenario(t, e.binary, fixtureDir)) })
+				t.Run(name, func(t *testing.T) { t.Parallel(); exercise(newScenario(t, e.binary, fixtureDir, forkProviderAddress)) })
 			}
 		})
 	}
@@ -344,16 +345,17 @@ type scenario struct {
 	engine, dir, file string
 	env               []string
 	lastPlanOutput    string
+	providerAddress   string
 }
 type change struct {
 	Actions      []string               `json:"actions"`
 	AfterUnknown map[string]interface{} `json:"after_unknown"`
 }
 
-func newScenario(t *testing.T, engine, fixtureDir string) *scenario {
+func newScenario(t *testing.T, engine, fixtureDir, providerAddress string) *scenario {
 	t.Helper()
 	dir := t.TempDir()
-	s := &scenario{t: t, engine: engine, dir: dir, file: filepath.Join(dir, "api.json")}
+	s := &scenario{t: t, engine: engine, dir: dir, file: filepath.Join(dir, "api.json"), providerAddress: providerAddress}
 	if err := mockapi.Save(s.file, mockapi.State{}); err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +367,7 @@ func newScenario(t *testing.T, engine, fixtureDir string) *scenario {
 
 func (s *scenario) useProvider(fixtureDir string) {
 	s.t.Helper()
-	config := fmt.Sprintf("provider_installation {\n dev_overrides {\n  \"registry.terraform.io/shadeform/shadeform\" = %q\n }\n direct { exclude = [\"registry.terraform.io/shadeform/shadeform\"] }\n}\n", fixtureDir)
+	config := fmt.Sprintf("provider_installation {\n dev_overrides {\n  %q = %q\n }\n direct { exclude = [%q] }\n}\n", s.providerAddress, fixtureDir, s.providerAddress)
 	if err := os.WriteFile(filepath.Join(s.dir, "test.tfrc"), []byte(config), 0600); err != nil {
 		s.t.Fatal(err)
 	}
@@ -377,7 +379,7 @@ func (s *scenario) config(setting, extra string) {
 	s.t.Helper()
 	config := `terraform {
   required_providers {
-    shadeform = { source = "registry.terraform.io/shadeform/shadeform" }
+    shadeform = { source = "` + s.providerAddress + `" }
   }
 }
 provider "shadeform" { api_key = "lifecycle-test-key" }
