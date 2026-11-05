@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -20,6 +21,7 @@ var (
 	_ resource.Resource                = &InstanceResource{}
 	_ resource.ResourceWithConfigure   = &InstanceResource{}
 	_ resource.ResourceWithImportState = &InstanceResource{}
+	_ resource.ResourceWithModifyPlan  = &InstanceResource{}
 )
 
 type InstanceResource struct {
@@ -27,26 +29,28 @@ type InstanceResource struct {
 }
 
 type InstanceResourceModel struct {
-	Id                types.String   `tfsdk:"id"`
-	Cloud             types.String   `tfsdk:"cloud"`
-	Region            types.String   `tfsdk:"region"`
-	ShadeInstanceType types.String   `tfsdk:"shade_instance_type"`
-	ShadeCloud        types.Bool     `tfsdk:"shade_cloud"`
-	Name              types.String   `tfsdk:"name"`
-	Os                types.String   `tfsdk:"os"`
-	SshKeyId          types.String   `tfsdk:"ssh_key_id"`
-	TemplateId        types.String   `tfsdk:"template_id"`
-	VolumeIds         types.List     `tfsdk:"volume_ids"`
-	CloudInstanceType types.String   `tfsdk:"cloud_instance_type"`
-	CloudAssignedID   types.String   `tfsdk:"cloud_assigned_id"`
-	IP                types.String   `tfsdk:"ip"`
-	SshUser           types.String   `tfsdk:"ssh_user"`
-	SshPort           types.Int64    `tfsdk:"ssh_port"`
-	Status            types.String   `tfsdk:"status"`
-	CostEstimate      types.String   `tfsdk:"cost_estimate"`
-	HourlyPrice       types.String   `tfsdk:"hourly_price"`
-	CreatedAt         types.String   `tfsdk:"created_at"`
-	Timeouts          timeouts.Value `tfsdk:"timeouts"`
+	Id                               types.String   `tfsdk:"id"`
+	Cloud                            types.String   `tfsdk:"cloud"`
+	Region                           types.String   `tfsdk:"region"`
+	ShadeInstanceType                types.String   `tfsdk:"shade_instance_type"`
+	ShadeCloud                       types.Bool     `tfsdk:"shade_cloud"`
+	Name                             types.String   `tfsdk:"name"`
+	Os                               types.String   `tfsdk:"os"`
+	SshKeyId                         types.String   `tfsdk:"ssh_key_id"`
+	TemplateId                       types.String   `tfsdk:"template_id"`
+	AutoDelete                       types.Object   `tfsdk:"auto_delete"`
+	EffectiveAutoDeleteDateThreshold types.String   `tfsdk:"effective_auto_delete_date_threshold"`
+	VolumeIds                        types.List     `tfsdk:"volume_ids"`
+	CloudInstanceType                types.String   `tfsdk:"cloud_instance_type"`
+	CloudAssignedID                  types.String   `tfsdk:"cloud_assigned_id"`
+	IP                               types.String   `tfsdk:"ip"`
+	SshUser                          types.String   `tfsdk:"ssh_user"`
+	SshPort                          types.Int64    `tfsdk:"ssh_port"`
+	Status                           types.String   `tfsdk:"status"`
+	CostEstimate                     types.String   `tfsdk:"cost_estimate"`
+	HourlyPrice                      types.String   `tfsdk:"hourly_price"`
+	CreatedAt                        types.String   `tfsdk:"created_at"`
+	Timeouts                         timeouts.Value `tfsdk:"timeouts"`
 }
 
 func NewInstanceResource() resource.Resource {
@@ -99,6 +103,21 @@ func (r *InstanceResource) Schema(ctx context.Context, _ resource.SchemaRequest,
 				Description: "The ID of the template to use for this instance.",
 				Optional:    true,
 			},
+			"auto_delete": schema.SingleNestedAttribute{
+				Description: "Manage only the automatic deletion date. Omit this object (or set it to null) to leave the remote date unchanged. A present object with a null or omitted date_threshold explicitly clears the date and maintains its absence. Removing this object stops management without clearing the date. Date updates on existing instances preserve spend thresholds. At creation, supplying this object overrides the template's entire auto_delete object, so its spend threshold is not inherited.",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"date_threshold": schema.StringAttribute{
+						Description: "Automatic deletion deadline as an RFC3339 timestamp with a timezone and no fractional seconds. On existing instances, null explicitly clears only the date. At creation, supplying auto_delete overrides the template's deletion settings. Changes do not replace the instance.",
+						Optional:    true,
+						Validators:  []validator.String{autoDeleteDateValidator{}},
+					},
+				},
+			},
+			"effective_auto_delete_date_threshold": schema.StringAttribute{
+				Description: "The deletion date currently reported by Shadeform, in UTC, including unmanaged and template-provided dates. Null when no date is set. This read-only value does not opt into managing the date.",
+				Computed:    true,
+			},
 			"volume_ids": schema.ListAttribute{
 				ElementType: types.StringType,
 				Description: "List of volume IDs to be mounted. Currently only supports 1 volume at a time.",
@@ -147,6 +166,19 @@ func (r *InstanceResource) Schema(ctx context.Context, _ resource.SchemaRequest,
 			}),
 		},
 	}
+}
+
+// Warn before creation so callers can see the template override in their plan.
+func (r *InstanceResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || !req.State.Raw.IsNull() {
+		return
+	}
+	var plan InstanceResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(templateAutoDeleteWarning(plan.TemplateId, plan.AutoDelete)...)
 }
 
 // Configure adds the provider configured client to the resource.
@@ -214,6 +246,18 @@ func (r *InstanceResource) Create(ctx context.Context, req resource.CreateReques
 		requestBody["volume_ids"] = volumeIds
 	}
 
+	date, dateDiags := autoDeleteDate(ctx, plan.AutoDelete)
+	resp.Diagnostics.Append(dateDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !plan.AutoDelete.IsNull() {
+		requestBody["auto_delete"] = autoDeletePayload(date)
+	}
+	// Also warn when applying a saved plan or values that resolved only at apply.
+	resp.Diagnostics.Append(templateAutoDeleteWarning(plan.TemplateId, plan.AutoDelete)...)
+
+	// Include auto_delete in this original request, never in a post-create update.
 	// Create instance
 	result, err := r.client.CreateInstance(requestBody)
 	if err != nil {
@@ -289,6 +333,10 @@ func (r *InstanceResource) Create(ctx context.Context, req resource.CreateReques
 
 	// Set all fields from the API response
 	plan.Id = types.StringValue(instanceID)
+	resp.Diagnostics.Append(confirmAutoDelete(ctx, &plan, instanceInfo)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	if cloud, ok := instanceInfo["cloud"].(string); ok {
 		plan.Cloud = types.StringValue(cloud)
 	}
@@ -327,51 +375,7 @@ func (r *InstanceResource) Create(ctx context.Context, req resource.CreateReques
 	} else {
 		plan.SshKeyId = types.StringNull()
 	}
-	if cloudInstanceType, ok := instanceInfo["cloud_instance_type"].(string); ok {
-		plan.CloudInstanceType = types.StringValue(cloudInstanceType)
-	} else {
-		plan.CloudInstanceType = types.StringNull()
-	}
-	if cloudAssignedId, ok := instanceInfo["cloud_assigned_id"].(string); ok {
-		plan.CloudAssignedID = types.StringValue(cloudAssignedId)
-	} else {
-		plan.CloudAssignedID = types.StringNull()
-	}
-	if ip, ok := instanceInfo["ip"].(string); ok {
-		plan.IP = types.StringValue(ip)
-	} else {
-		plan.IP = types.StringNull()
-	}
-	if sshUser, ok := instanceInfo["ssh_user"].(string); ok {
-		plan.SshUser = types.StringValue(sshUser)
-	} else {
-		plan.SshUser = types.StringNull()
-	}
-	if sshPort, ok := instanceInfo["ssh_port"].(int64); ok {
-		plan.SshPort = types.Int64Value(sshPort)
-	} else {
-		plan.SshPort = types.Int64Null()
-	}
-	if status, ok := instanceInfo["status"].(string); ok {
-		plan.Status = types.StringValue(status)
-	} else {
-		plan.Status = types.StringNull()
-	}
-	if costEstimate, ok := instanceInfo["cost_estimate"].(string); ok {
-		plan.CostEstimate = types.StringValue(costEstimate)
-	} else {
-		plan.CostEstimate = types.StringNull()
-	}
-	if hourlyPrice, ok := instanceInfo["hourly_price"].(string); ok {
-		plan.HourlyPrice = types.StringValue(hourlyPrice)
-	} else {
-		plan.HourlyPrice = types.StringNull()
-	}
-	if createdAt, ok := instanceInfo["created_at"].(string); ok {
-		plan.CreatedAt = types.StringValue(createdAt)
-	} else {
-		plan.CreatedAt = types.StringNull()
-	}
+	refreshComputedFields(&plan, instanceInfo)
 
 	// Handle volume_ids - it's a list in the API response
 	if volumeIdsRaw, ok := instanceInfo["volume_ids"]; ok && volumeIdsRaw != nil {
@@ -412,10 +416,22 @@ func (r *InstanceResource) Read(ctx context.Context, req resource.ReadRequest, r
 	// Get instance from API
 	result, err := r.client.GetInstance(state.Id.ValueString())
 	if err != nil {
+		if provider_shadeform.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error reading instance",
 			"Could not read instance, unexpected error: "+err.Error(),
 		)
+		return
+	}
+	if status, _ := result["status"].(string); status == "deleted" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+	resp.Diagnostics.Append(refreshAutoDelete(ctx, &state, result)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -454,51 +470,7 @@ func (r *InstanceResource) Read(ctx context.Context, req resource.ReadRequest, r
 	} else {
 		state.SshKeyId = types.StringNull()
 	}
-	if cloudInstanceType, ok := result["cloud_instance_type"].(string); ok {
-		state.CloudInstanceType = types.StringValue(cloudInstanceType)
-	} else {
-		state.CloudInstanceType = types.StringNull()
-	}
-	if cloudAssignedId, ok := result["cloud_assigned_id"].(string); ok {
-		state.CloudAssignedID = types.StringValue(cloudAssignedId)
-	} else {
-		state.CloudAssignedID = types.StringNull()
-	}
-	if ip, ok := result["ip"].(string); ok {
-		state.IP = types.StringValue(ip)
-	} else {
-		state.IP = types.StringNull()
-	}
-	if sshUser, ok := result["ssh_user"].(string); ok {
-		state.SshUser = types.StringValue(sshUser)
-	} else {
-		state.SshUser = types.StringNull()
-	}
-	if sshPort, ok := result["ssh_port"].(int64); ok {
-		state.SshPort = types.Int64Value(sshPort)
-	} else {
-		state.SshPort = types.Int64Null()
-	}
-	if status, ok := result["status"].(string); ok {
-		state.Status = types.StringValue(status)
-	} else {
-		state.Status = types.StringNull()
-	}
-	if costEstimate, ok := result["cost_estimate"].(string); ok {
-		state.CostEstimate = types.StringValue(costEstimate)
-	} else {
-		state.CostEstimate = types.StringNull()
-	}
-	if hourlyPrice, ok := result["hourly_price"].(string); ok {
-		state.HourlyPrice = types.StringValue(hourlyPrice)
-	} else {
-		state.HourlyPrice = types.StringNull()
-	}
-	if createdAt, ok := result["created_at"].(string); ok {
-		state.CreatedAt = types.StringValue(createdAt)
-	} else {
-		state.CreatedAt = types.StringNull()
-	}
+	refreshComputedFields(&state, result)
 
 	// Handle volume_ids - it's a list in the API response
 	if volumeIdsRaw, ok := result["volume_ids"]; ok && volumeIdsRaw != nil {
@@ -545,15 +517,24 @@ func (r *InstanceResource) Update(ctx context.Context, req resource.UpdateReques
 	if !plan.Name.Equal(state.Name) {
 		requestBody["name"] = plan.Name.ValueString()
 	}
-
-	// Update instance
-	err := r.client.UpdateInstance(state.Id.ValueString(), requestBody)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating instance",
-			"Could not update instance, unexpected error: "+err.Error(),
-		)
+	date, dateDiags := autoDeleteDate(ctx, plan.AutoDelete)
+	resp.Diagnostics.Append(dateDiags...)
+	if resp.Diagnostics.HasError() {
 		return
+	}
+	if !plan.AutoDelete.IsNull() && !sameAutoDeleteDate(date, state.EffectiveAutoDeleteDateThreshold) {
+		requestBody["auto_delete"] = autoDeletePayload(date)
+	}
+
+	// Removing the configuration object stops management; no remote clear is sent.
+	if len(requestBody) > 0 {
+		if err := r.client.UpdateInstance(state.Id.ValueString(), requestBody); err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating instance",
+				"Could not update instance, unexpected error: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Fetch the updated instance data to ensure all computed fields are set
@@ -568,6 +549,18 @@ func (r *InstanceResource) Update(ctx context.Context, req resource.UpdateReques
 
 	// Update the plan with the fetched data
 	plan.Id = types.StringValue(state.Id.ValueString())
+	refreshComputedFields(&plan, instanceInfo)
+	if plan.SshKeyId.IsUnknown() || plan.SshKeyId.IsNull() {
+		if sshKeyId, ok := instanceInfo["ssh_key_id"].(string); ok {
+			plan.SshKeyId = types.StringValue(sshKeyId)
+		} else {
+			plan.SshKeyId = types.StringNull()
+		}
+	}
+	resp.Diagnostics.Append(confirmAutoDelete(ctx, &plan, instanceInfo)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	if cloud, ok := instanceInfo["cloud"].(string); ok {
 		plan.Cloud = types.StringValue(cloud)
 	}
@@ -635,7 +628,7 @@ func (r *InstanceResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	// Delete instance
 	err := r.client.DeleteInstance(state.Id.ValueString())
-	if err != nil {
+	if err != nil && !provider_shadeform.IsNotFound(err) {
 		resp.Diagnostics.AddError(
 			"Error deleting instance",
 			"Could not delete instance, unexpected error: "+err.Error(),

@@ -12,11 +12,15 @@ Manages a Shadeform instance.
 
 ## Example Usage
 
+This example targets the proposed fork release v0.2.0, pending publication.
+See the [distribution status](../releases.md).
+
 ```terraform
 terraform {
   required_providers {
     shadeform = {
-      source = "shadeform/shadeform"
+      source  = "registry.opentofu.org/servescale/shadeform"
+      version = "~> 0.2.0"
     }
   }
 }
@@ -33,6 +37,66 @@ resource "shadeform_instance" "test-instance" {
 } 
 ```
 
+## Automatic deletion
+
+Use `auto_delete.date_threshold` to manage an instance's automatic deletion date.
+
+Set a stable, whole-second RFC3339 deadline in the resource configuration:
+
+```hcl
+resource "shadeform_instance" "worker" {
+  cloud               = "scaleway"
+  region              = "paris-france-1"
+  shade_instance_type = "H100"
+  name                = "worker"
+
+  auto_delete = {
+    date_threshold = "2030-01-02T15:04:05Z"
+  }
+}
+
+output "worker_deletion_date" {
+  value = shadeform_instance.worker.effective_auto_delete_date_threshold
+}
+```
+
+Choose a future date suitable for your workload. Avoid deriving the deadline from `timestamp()` on every apply: that continually changes the desired date. Timezone offsets are accepted, and equivalent offsets do not cause readback drift. Fractional seconds are rejected because the service does not preserve them.
+
+The date is sent in the original creation request, before readiness polling. The provider never clears it automatically after creation, including when a later creation step fails. Existing timeout cleanup may still delete the whole instance; if an instance survives, no request is sent to remove its date.
+
+### Set, clear, or leave unchanged
+
+| Configuration | Behavior |
+| --- | --- |
+| `auto_delete = { date_threshold = "2030-01-02T15:04:05Z" }` | Set and maintain this date, updating the existing instance in place. |
+| `auto_delete = { date_threshold = null }` | Clear only the date and maintain its absence. |
+| `auto_delete = {}` | The same explicit clearing request as a null date. |
+| Omit `auto_delete`, or set `auto_delete = null` | Leave the remote date unchanged. |
+
+To clear a deadline, replace the configured object with:
+
+```hcl
+auto_delete = {
+  date_threshold = null
+}
+```
+
+**Removing the entire object stops management; it does not clear the deadline.** Imported instances and instances with template-provided dates are unmanaged until an object is configured. Refresh still reports their dates in `effective_auto_delete_date_threshold` without adopting them into configuration. This output is null when no date is set, including when a spend threshold alone is present.
+
+While the object is configured, refresh detects date drift and the next apply restores the requested date or absence. Updating or clearing the date on an existing instance preserves its spend threshold and does not replace the instance. Unknown values must resolve before an API mutation; unknown is never treated as a clearing request.
+
+> **Warning: template spend protection is not inherited when overriding auto-delete at creation.** If you reference an externally created template with `template_id` and also supply `auto_delete`, Shadeform replaces the template's entire `auto_delete` object. For example, adding a deletion date to an instance created from a template with a $10 spend threshold gives the instance the date but no inherited $10 threshold. Using `auto_delete = { date_threshold = null }` or `auto_delete = {}` suppresses both inherited thresholds. The template itself is unchanged. This is also how Shadeform behaves when the same payload is sent directly to its API.
+
+Terraform/OpenTofu displays **"Template spend threshold will not be inherited"** during creation planning when both values are known, and during creation apply (including saved plans and values that resolve only at apply). This warning does not prevent creation. It is conditional on using both settings, without looking up whether the template actually contains a spend threshold. It is not emitted for updates to existing instances.
+
+Omit `auto_delete` (or set it to null) to inherit both template thresholds at creation. This provider exposes only the date and does not copy the template spend threshold into the create request. Date updates on an existing instance preserve its spend threshold.
+
+When using the date as provisioning protection, confirm that the **exact instance ID is present in durable Terraform/OpenTofu state** before applying a configuration that clears it. A successful provider response alone does not prove state persistence. The caller owns that orchestration.
+
+The provider verifies the requested date against readback after create/update. If a template or the service prevents the requested date or absence from taking effect, apply returns an error identifying the instance; Create does not issue a follow-up clearing request.
+
+Refresh removes instances from state when Shadeform returns HTTP 404 or reports `status: deleted`. A later apply may then create a new instance if its resource remains configured.
+
 <!-- schema generated by tfplugindocs -->
 ## Schema
 
@@ -45,12 +109,14 @@ resource "shadeform_instance" "test-instance" {
 
 ### Optional
 
+- `auto_delete` (Object) Optional management of the deletion date. Omission leaves the remote date unchanged; a present object with a null or omitted `date_threshold` clears it. See the nested schema below.
 - `os` (String) The operating system of the instance. If OS is not provided, it will default to the default OS for the cloud provider.
 - `volume_ids` (List of String) List of volume IDs to be mounted. Currently only supports 1 volume at a time.
 - `ssh_key_id` (String) The ID of the SSH key to use for this instance.
 
 ### Read-Only
 
+- `effective_auto_delete_date_threshold` (String) Current remote deletion date in UTC, including unmanaged dates. Null when no date exists. Reading this value does not enable management.
 - `id` (String) The unique identifier for the instance.
 - `cloud_instance_type` (String) The type of the instance in the cloud provider.
 - `cloud_assigned_id` (String) The ID of the instance in the cloud provider.
@@ -61,3 +127,7 @@ resource "shadeform_instance" "test-instance" {
 - `cost_estimate` (String) The cost estimate so far for the instance.
 - `hourly_price` (String) The hourly price of the instance.
 - `created_at` (String) The date and time the instance was created.
+
+### Nested schema for `auto_delete`
+
+- `date_threshold` (String, Optional) RFC3339 deletion date with a timezone and no fractional seconds. A null or omitted value inside a configured object explicitly clears the date. Changes are in place. Date updates on existing instances preserve spend thresholds; see the template creation warning above.

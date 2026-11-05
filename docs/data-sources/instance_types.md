@@ -12,11 +12,15 @@ Retrieve available instance types from Shadeform.
 
 ## Example Usage
 
+This example targets the proposed fork release v0.2.0, pending publication.
+See the [distribution status](../releases.md).
+
 ```terraform
 terraform {
   required_providers {
     shadeform = {
-      source = "shadeform/shadeform"
+      source  = "registry.opentofu.org/servescale/shadeform"
+      version = "~> 0.2.0"
     }
   }
 }
