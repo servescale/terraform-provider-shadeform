@@ -12,6 +12,7 @@ This independent ServeScale release is pending publication and OpenTofu registry
 ### Added
 
 - Independent ServeScale provider identity `registry.opentofu.org/servescale/shadeform`, with installation instructions and a pending v0.2.0 release checklist.
+- Upstream-to-fork state migration instructions and OpenTofu tests for both upstream registry hostnames, including local package installation, lock-file verification, and same-instance date updates with spend preservation.
 - Optional instance `auto_delete.date_threshold` management: set a date at creation, update it in place, or explicitly clear it. Date updates on an existing instance preserve spend thresholds. At creation, supplying the object overrides the template's whole auto-delete object, including its inherited spend threshold. Omitting the object leaves remote dates unchanged and inherits template thresholds at creation.
 - Read-only `effective_auto_delete_date_threshold` for inspecting managed and unmanaged dates.
 - Terraform/OpenTofu creation warnings when `template_id` and `auto_delete` are supplied together, explaining that the template's spend threshold is not inherited.

@@ -7,7 +7,7 @@ A Terraform/OpenTofu provider for managing GPU instances and storage volumes on 
 
 This is an independently maintained ServeScale fork for OpenTofu, based on upstream [v0.1.3](https://github.com/shadeform/terraform-provider-shadeform/tree/v0.1.3) (`c5e5295741be0c0859dee5e3a51dd14b6ea61717`). Its provider address is `registry.opentofu.org/servescale/shadeform`. Fork versions follow independent SemVer; matching an upstream version does not imply identical code or compatibility. Upstream contribution remains an option; this fork has no planned retirement date.
 
-**Distribution is pending.** The proposed first fork release is `v0.2.0`; the configuration below becomes installable only after signed release artifacts are published and OpenTofu registry registration is approved. See the [release and distribution checklist](docs/releases.md). The release and migration requirements in [issue #3](https://github.com/servescale/terraform-provider-shadeform/issues/3) remain outstanding.
+**Distribution is pending.** The proposed first fork release is `v0.2.0`; the configuration below becomes installable only after signed release artifacts are published and OpenTofu registry registration is approved. See the [release and distribution checklist](docs/releases.md). The release and published-distribution verification requirements in [issue #3](https://github.com/servescale/terraform-provider-shadeform/issues/3) remain outstanding.
 
 ## Quick Start
 
@@ -26,7 +26,7 @@ terraform {
 }
 ```
 
-OpenTofu resolves this shorthand to `registry.opentofu.org/servescale/shadeform`. Use the full address in configurations shared with Terraform, whose default registry differs. HashiCorp registry publication is not part of this fork's release contract. Existing upstream state requires provider-address migration; changing only this block is insufficient. Migration documentation and coverage remain outstanding in PR #6's second review finding.
+OpenTofu resolves this shorthand to `registry.opentofu.org/servescale/shadeform`. Use the full address in configurations shared with Terraform, whose default registry differs. HashiCorp registry publication is not part of this fork's release contract. Existing upstream state requires [provider-address migration](docs/migration.md); changing only this block is insufficient.
 
 ### Configuration
 

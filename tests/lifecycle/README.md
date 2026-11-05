@@ -19,11 +19,11 @@ SHADEFORM_LIFECYCLE_TOFU=/absolute/path/to/tofu \
 go test -buildvcs=false ./tests/lifecycle -v -count=1
 ```
 
-Without `SHADEFORM_LIFECYCLE=1`, the suite is skipped. When enabled, having no available CLI is an error. Explicit executable paths must exist. Versions are logged. All 22 scenarios passed with OpenTofu 1.13.5 on Linux amd64 after introducing the fork identity. Historical runs before the identity change passed with Terraform 1.14.4 and OpenTofu 1.13.1; Terraform has not been rerun with the fork identity.
+Without `SHADEFORM_LIFECYCLE=1`, the suite is skipped. When enabled, having no available CLI is an error. Explicit executable paths must exist. Versions are logged. The 22 lifecycle/schema scenarios and two migration scenarios passed with OpenTofu 1.13.5 on Linux amd64. Historical runs before the identity change passed with Terraform 1.14.4 and OpenTofu 1.13.1; Terraform has not been rerun with the fork identity. Migration scenarios require OpenTofu and are skipped when only Terraform is available.
 
 Current lifecycle scenarios use the fork address `registry.opentofu.org/servescale/shadeform` explicitly in HCL, CLI overrides, and the fixture entrypoint.
 
-The test builds a provider executable in a temporary directory and uses a private CLI configuration with a development override. It does not run `init` or change the user's CLI configuration. Local plugin IPC must be allowed; a restricted sandbox can block the plugin handshake even though the fixture makes no external API requests. The production readiness polling interval is unchanged, so creation scenarios take at least 15 seconds. Independent scenarios run in parallel.
+The lifecycle/schema tests build a provider executable in a temporary directory and use a private CLI configuration with a development override, without running `init`. Migration tests instead install local versioned packages with `init` and a filesystem mirror. Neither changes the user's CLI configuration. Local plugin IPC must be allowed; a restricted sandbox can block the plugin handshake even though the fixture makes no external API requests. The production readiness polling interval is unchanged, so creation scenarios take at least 15 seconds. Independent scenarios run in parallel.
 
 The legacy-state suite additionally requires `git`, `tar`, and commit `3c30a04ad5774aa586bb9f76b82c64995ace86ff` in the local repository history. It exports that pinned pre-feature revision to a temporary directory and builds it with its original `go.mod` and `go.sum`. A shallow clone must include this commit. Production source is unchanged; a test entry point replaces the default HTTP transport with the same local fixture. The tests do not edit the checkout or synthesize old state by removing new fields.
 
@@ -76,3 +76,21 @@ The test verifies that the old raw state contains neither new field, then switch
 Each case then explicitly clears the date, manages a new date, checks repeated applies, preserves any spend threshold, and destroys the same instance. Both Terraform 1.14.4 and OpenTofu 1.13.1 passed all five cases. Together with the 17 lifecycle scenarios this is 44 scenario runs across both engines.
 
 This covers the pre-feature schema at the pinned revision and an unchanged provider source address using local state. It does not establish compatibility with every historical release, provider-address migrations, remote backend migrations, or downgrading new state to the old provider.
+
+## Upstream provider-address migration
+
+Run only the new migration checks with:
+
+```sh
+SHADEFORM_LIFECYCLE=1 go test -buildvcs=false ./tests/lifecycle -run '^TestOpenTofuProviderMigration$' -v -count=1
+```
+
+Two OpenTofu scenarios start with upstream state at `registry.terraform.io/shadeform/shadeform` or `registry.opentofu.org/shadeform/shadeform`. Each installs a locally built old provider package labelled 0.1.3, creates the instance with the pinned old implementation, adds external date/spend thresholds, and refreshes using that implementation. Old state is never synthesized by removing new fields.
+
+The scenarios discover the full source in raw state and run `state replace-provider` to `registry.opentofu.org/servescale/shadeform`. They assert that only the provider reference changes: state lineage, resource count, schema version, and existing attributes survive, the lock file is untouched, and the command makes no API calls.
+
+After updating HCL, normal `init` installs the local fork package labelled 0.2.0. A filesystem mirror is the only installation method; there are no development overrides or direct registry fallback. Tests check that configuration and state select the fork, the CLI reports version 0.2.0, the new lock block has its own checksum, and the old block is removed. Readonly initialization preserves the lock file; substituting a different binary under the fork address must fail checksum verification.
+
+The upgraded state decodes without refresh and a subsequent refresh/no-op apply preserves the instance ID, configuration, and remote thresholds without API mutations. The tests then set and clear the date in place, preserving the spend threshold, checking repeat applies and exact mutation counts, and destroy the same instance.
+
+These are two additional scenarios beyond the 22 lifecycle/schema cases. They validate the [migration procedure](../../docs/migration.md) with local state and fixture packages. They do not validate a published signed distribution, remote backends, or downgrades; registry installation remains on the release checklist.

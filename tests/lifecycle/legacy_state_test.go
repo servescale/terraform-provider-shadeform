@@ -118,6 +118,8 @@ func TestTerraformLegacyState(t *testing.T) {
 
 type rawInstanceState struct {
 	Lineage       string
+	Provider      string
+	ResourceCount int
 	SchemaVersion int
 	Attributes    map[string]interface{}
 }
@@ -129,6 +131,7 @@ func (s *scenario) rawInstanceState() rawInstanceState {
 		Resources []struct {
 			Type      string `json:"type"`
 			Name      string `json:"name"`
+			Provider  string `json:"provider"`
 			Instances []struct {
 				SchemaVersion int                    `json:"schema_version"`
 				Attributes    map[string]interface{} `json:"attributes"`
@@ -140,7 +143,10 @@ func (s *scenario) rawInstanceState() rawInstanceState {
 	}
 	for _, r := range state.Resources {
 		if r.Type == "shadeform_instance" && r.Name == "test" && len(r.Instances) == 1 {
-			return rawInstanceState{state.Lineage, r.Instances[0].SchemaVersion, r.Instances[0].Attributes}
+			return rawInstanceState{
+				Lineage: state.Lineage, Provider: r.Provider, ResourceCount: len(state.Resources),
+				SchemaVersion: r.Instances[0].SchemaVersion, Attributes: r.Instances[0].Attributes,
+			}
 		}
 	}
 	s.t.Fatal("missing instance in raw state")

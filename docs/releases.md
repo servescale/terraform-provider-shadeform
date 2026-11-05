@@ -25,10 +25,11 @@ requires an explicit compatibility and consumer migration decision.
 
 ## First release checklist
 
-All items below remain outstanding until verified by the release maintainer:
+Track delivery here. Local fixture checks do not complete the published-distribution checks:
 
-- [ ] Complete provider-address migration documentation and coverage (PR #6's
-  second review finding), keeping the existing schema compatibility tests.
+- [x] Add [provider-address migration documentation](migration.md) and offline
+  OpenTofu coverage for both upstream registry hostnames, keeping the existing
+  same-address schema compatibility tests.
 - [ ] Review and test the release commit; convert the Unreleased changelog section
   to v0.2.0 with its release date. Tag that exact commit `v0.2.0`.
 - [ ] Configure the fork's release signing key and the workflow secrets
@@ -55,9 +56,10 @@ All items below remain outstanding until verified by the release maintainer:
   `registry.opentofu.org/servescale/shadeform` v0.2.0 and verifies the signed
   checksums. Commit the resulting `.terraform.lock.hcl` in consumer projects;
   use `version = "0.2.0"` if an exact version is required.
-- [ ] Validate the documented migration using the actual full provider address
-  recorded in existing state, including provider selection and lock-file
-  behavior. Local development overrides do not verify registry installation.
+- [ ] Repeat the documented migration with the published signed fork distribution,
+  using the actual full provider address recorded in existing state. The local
+  filesystem-mirror tests verify provider selection and lock-file behavior, but
+  do not verify registry installation or release signatures.
 - [ ] Update the distribution status and installation documentation only after
   the package is installable. Keep issue #3's release requirements outstanding
   until the reviewed distribution, checksums, compatibility notes, and migration
@@ -72,8 +74,9 @@ After publication, OpenTofu users can follow the
 with Terraform. See [OpenTofu provider source addresses](https://opentofu.org/docs/language/providers/requirements/#source-addresses).
 
 The lifecycle suite exercises the fork identity with a local fixture, alongside
-separate legacy schema checks. It does not prove registry installation or address
-migration. See [test coverage and limits](../tests/lifecycle/README.md).
+separate legacy schema checks and upstream-address migration tests using a local
+filesystem mirror. It does not prove registry installation. See the
+[migration procedure](migration.md) and [test coverage and limits](../tests/lifecycle/README.md).
 
 Report fork bugs and distribution problems to
 [ServeScale's issue tracker](https://github.com/servescale/terraform-provider-shadeform/issues).
