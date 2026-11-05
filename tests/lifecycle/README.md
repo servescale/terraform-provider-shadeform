@@ -19,7 +19,7 @@ SHADEFORM_LIFECYCLE_TOFU=/absolute/path/to/tofu \
 go test -buildvcs=false ./tests/lifecycle -v -count=1
 ```
 
-Without `SHADEFORM_LIFECYCLE=1`, the suite is skipped. When enabled, having no available CLI is an error. Explicit executable paths must exist. Versions are logged. The 22 lifecycle/schema scenarios and two migration scenarios passed with OpenTofu 1.13.5 on Linux amd64. Historical runs before the identity change passed with Terraform 1.14.4 and OpenTofu 1.13.1; Terraform has not been rerun with the fork identity. Migration scenarios require OpenTofu and are skipped when only Terraform is available.
+Without `SHADEFORM_LIFECYCLE=1`, the suite is skipped. When enabled, having no available CLI is an error. Explicit executable paths must exist. Versions are logged. The 22 lifecycle/schema scenarios and two migration scenarios passed with OpenTofu 1.13.5 on Linux amd64. The reviewer independently passed all 24 scenarios with race detection on OpenTofu 1.13.1 at `9f2e955` ([review evidence](https://github.com/servescale/terraform-provider-shadeform/pull/6#pullrequestreview-5792402938)). These tested versions do not establish an untested minimum-version range. Historical runs before the identity change passed with Terraform 1.14.4 and OpenTofu 1.13.1; Terraform has not been rerun with the fork identity. Migration scenarios require OpenTofu and are skipped when only Terraform is available.
 
 Current lifecycle scenarios use the fork address `registry.opentofu.org/servescale/shadeform` explicitly in HCL, CLI overrides, and the fixture entrypoint.
 
@@ -73,7 +73,7 @@ These schema checks deliberately retain `registry.terraform.io/shadeform/shadefo
 
 The test verifies that the old raw state contains neither new field, then switches only the provider executable. It requires a clean plan with refresh disabled, successful refresh-only apply, and a clean normal plan/apply. The resulting state must retain its lineage, schema version, instance ID, and existing configuration fields. `auto_delete` must be null (unmanaged), while `effective_auto_delete_date_threshold` reflects the remote date or null. Upgrade performs no API mutations.
 
-Each case then explicitly clears the date, manages a new date, checks repeated applies, preserves any spend threshold, and destroys the same instance. Both Terraform 1.14.4 and OpenTofu 1.13.1 passed all five cases. Together with the 17 lifecycle scenarios this is 44 scenario runs across both engines.
+Each case then explicitly clears the date, manages a new date, checks repeated applies, preserves any spend threshold, and destroys the same instance. Historical runs before the fork identity change passed all five cases with Terraform 1.14.4 and OpenTofu 1.13.1. Together with the 17 lifecycle scenarios, those historical runs totaled 44 across both engines; they do not qualify Terraform with the fork identity.
 
 This covers the pre-feature schema at the pinned revision and an unchanged provider source address using local state. It does not establish compatibility with every historical release, provider-address migrations, remote backend migrations, or downgrading new state to the old provider.
 
@@ -85,11 +85,11 @@ Run only the new migration checks with:
 SHADEFORM_LIFECYCLE=1 go test -buildvcs=false ./tests/lifecycle -run '^TestOpenTofuProviderMigration$' -v -count=1
 ```
 
-Two OpenTofu scenarios start with upstream state at `registry.terraform.io/shadeform/shadeform` or `registry.opentofu.org/shadeform/shadeform`. Each installs a locally built old provider package labelled 0.1.3, creates the instance with the pinned old implementation, adds external date/spend thresholds, and refreshes using that implementation. Old state is never synthesized by removing new fields.
+Two OpenTofu scenarios start with upstream state at `registry.terraform.io/shadeform/shadeform` or `registry.opentofu.org/shadeform/shadeform`. Each installs a locally built old provider package labeled 0.1.3, creates the instance with the pinned old implementation, adds external date/spend thresholds, and refreshes using that implementation. Old state is never synthesized by removing new fields.
 
 The scenarios discover the full source in raw state and run `state replace-provider` to `registry.opentofu.org/servescale/shadeform`. They assert that only the provider reference changes: state lineage, resource count, schema version, and existing attributes survive, the lock file is untouched, and the command makes no API calls.
 
-After updating HCL, normal `init` installs the local fork package labelled 0.2.0. A filesystem mirror is the only installation method; there are no development overrides or direct registry fallback. Tests check that configuration and state select the fork, the CLI reports version 0.2.0, the new lock block has its own checksum, and the old block is removed. Readonly initialization preserves the lock file; substituting a different binary under the fork address must fail checksum verification.
+After updating HCL, normal `init` installs the local fork package labeled 0.2.0. A filesystem mirror is the only installation method; there are no development overrides or direct registry fallback. Tests check that configuration and state select the fork, the CLI reports version 0.2.0, the new lock block has its own checksum, and the old block is removed. Readonly initialization preserves the lock file; substituting a different binary under the fork address must fail checksum verification.
 
 The upgraded state decodes without refresh and a subsequent refresh/no-op apply preserves the instance ID, configuration, and remote thresholds without API mutations. The tests then set and clear the date in place, preserving the spend threshold, checking repeat applies and exact mutation counts, and destroy the same instance.
 

@@ -8,7 +8,7 @@ description: |-
 
 # shadeform Provider
 
-This is the independently maintained ServeScale fork, based on upstream v0.1.3.
+This is the independently maintained servescale fork, based on upstream v0.1.3.
 The planned OpenTofu source is `servescale/shadeform`
 (`registry.opentofu.org/servescale/shadeform`), with independent SemVer releases
 starting at proposed `v0.2.0`. Publication and registry registration are pending;

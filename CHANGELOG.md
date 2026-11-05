@@ -7,11 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased — proposed fork v0.2.0
 
-This independent ServeScale release is pending publication and OpenTofu registry registration. Its address is `registry.opentofu.org/servescale/shadeform`. The upstream baseline is v0.1.3 (`c5e5295741be0c0859dee5e3a51dd14b6ea61717`); the v0.1.x entries below describe upstream history. See the [release checklist](docs/releases.md) for outstanding distribution requirements.
+This independent servescale release is pending publication and OpenTofu registry registration. Its address is `registry.opentofu.org/servescale/shadeform`. The upstream baseline is v0.1.3 (`c5e5295741be0c0859dee5e3a51dd14b6ea61717`); the v0.1.x entries below describe upstream history. See the [release checklist](docs/releases.md) for outstanding distribution requirements.
 
 ### Added
 
-- Independent ServeScale provider identity `registry.opentofu.org/servescale/shadeform`, with installation instructions and a pending v0.2.0 release checklist.
+- Independent servescale provider identity `registry.opentofu.org/servescale/shadeform`, with installation instructions and a pending v0.2.0 release checklist.
 - Upstream-to-fork state migration instructions and OpenTofu tests for both upstream registry hostnames, including local package installation, lock-file verification, and same-instance date updates with spend preservation.
 - Optional instance `auto_delete.date_threshold` management: set a date at creation, update it in place, or explicitly clear it. Date updates on an existing instance preserve spend thresholds. At creation, supplying the object overrides the template's whole auto-delete object, including its inherited spend threshold. Omitting the object leaves remote dates unchanged and inherits template thresholds at creation.
 - Read-only `effective_auto_delete_date_threshold` for inspecting managed and unmanaged dates.

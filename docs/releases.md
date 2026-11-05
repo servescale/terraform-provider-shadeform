@@ -1,6 +1,6 @@
 # Fork releases and distribution
 
-ServeScale independently maintains this Shadeform provider for OpenTofu at
+servescale independently maintains this Shadeform provider for OpenTofu at
 `registry.opentofu.org/servescale/shadeform`. The upstream baseline is
 `shadeform/terraform-provider-shadeform` v0.1.3, commit
 `c5e5295741be0c0859dee5e3a51dd14b6ea61717`.
@@ -79,4 +79,4 @@ filesystem mirror. It does not prove registry installation. See the
 [migration procedure](migration.md) and [test coverage and limits](../tests/lifecycle/README.md).
 
 Report fork bugs and distribution problems to
-[ServeScale's issue tracker](https://github.com/servescale/terraform-provider-shadeform/issues).
+[servescale's issue tracker](https://github.com/servescale/terraform-provider-shadeform/issues).

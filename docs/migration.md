@@ -1,4 +1,4 @@
-# Migrate upstream state to the ServeScale provider
+# Migrate upstream state to the servescale provider
 
 Use this procedure **after the reviewed fork release is published and installable**.
 The proposed first release, v0.2.0, is still pending; see the
