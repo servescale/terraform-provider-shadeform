@@ -1,0 +1,96 @@
+# Instance lifecycle tests
+
+These tests run real Terraform/OpenTofu CLI commands against the production provider's schema and resource methods. A test-only provider wrapper changes only the API transport to a file-backed fixture. The fixture never forwards HTTP requests, and the test processes use a synthetic API key. No Shadeform account, cloud allocation, registry download, or live API connection is required.
+
+## Running
+
+Install Terraform and/or OpenTofu, then enable the suite explicitly:
+
+```sh
+SHADEFORM_LIFECYCLE=1 go test -buildvcs=false ./tests/lifecycle -v -count=1
+```
+
+The suite finds `terraform` and `tofu` on `PATH` and runs each available CLI. You can select binaries explicitly:
+
+```sh
+SHADEFORM_LIFECYCLE=1 \
+SHADEFORM_LIFECYCLE_TERRAFORM=/absolute/path/to/terraform \
+SHADEFORM_LIFECYCLE_TOFU=/absolute/path/to/tofu \
+go test -buildvcs=false ./tests/lifecycle -v -count=1
+```
+
+Without `SHADEFORM_LIFECYCLE=1`, the suite is skipped. When enabled, having no available CLI is an error. Explicit executable paths must exist. Versions are logged. The 22 lifecycle/schema scenarios and two migration scenarios passed with OpenTofu 1.13.5 on Linux amd64. The reviewer independently passed all 24 scenarios with race detection on OpenTofu 1.13.1 at `9f2e955` ([review evidence](https://github.com/servescale/terraform-provider-shadeform/pull/6#pullrequestreview-5792402938)). These tested versions do not establish an untested minimum-version range. Historical runs before the identity change passed with Terraform 1.14.4 and OpenTofu 1.13.1; Terraform has not been rerun with the fork identity. Migration scenarios require OpenTofu and are skipped when only Terraform is available.
+
+Current lifecycle scenarios use the fork address `registry.opentofu.org/servescale/shadeform` explicitly in HCL, CLI overrides, and the fixture entrypoint.
+
+The lifecycle/schema tests build a provider executable in a temporary directory and use a private CLI configuration with a development override, without running `init`. Migration tests instead install local versioned packages with `init` and a filesystem mirror. Neither changes the user's CLI configuration. Local plugin IPC must be allowed; a restricted sandbox can block the plugin handshake even though the fixture makes no external API requests. The production readiness polling interval is unchanged, so creation scenarios take at least 15 seconds. Independent scenarios run in parallel.
+
+The legacy-state suite additionally requires `git`, `tar`, and commit `3c30a04ad5774aa586bb9f76b82c64995ace86ff` in the local repository history. It exports that pinned pre-feature revision to a temporary directory and builds it with its original `go.mod` and `go.sum`. A shallow clone must include this commit. Production source is unchanged; a test entry point replaces the default HTTP transport with the same local fixture. The tests do not edit the checkout or synthesize old state by removing new fields.
+
+To run only the upgrade checks, use the same environment variables with:
+
+```sh
+SHADEFORM_LIFECYCLE=1 go test -buildvcs=false ./tests/lifecycle -run '^TestTerraformLegacyState$' -v -count=1
+```
+
+## Coverage
+
+Seventeen scenarios run per CLI:
+
+1. Create with a date, change it in place, change timezone spelling, reconcile managed drift, explicitly clear, repeat apply, use an empty object, stop management, observe unmanaged drift, and destroy.
+2. Import an instance with a date and spend threshold without adopting management, then explicitly clear only its date and destroy.
+3. Create with `auto_delete` omitted and confirm a clean subsequent plan.
+4. Create with an explicit null date and preserve the present clearing object in state.
+5. Resolve an unknown date from a built-in `terraform_data` resource during apply.
+6. Resolve an unknown outer object during apply.
+7. Reject invalid dates, fractional seconds, and invalid timezone offsets before API mutations.
+8. Remove an externally deleted instance from state after HTTP 200 with `status: deleted`.
+9. Remove an instance from state after HTTP 404.
+10. Preserve the original deadline after a readiness polling HTTP error.
+11. Preserve the original deadline when readiness reports an instance error.
+12. Preserve the original deadline when the final read fails after readiness succeeds.
+13. Preserve the original deadline when creation times out and cleanup fails.
+14. Remove the allocation when creation times out and cleanup succeeds.
+15. Inherit a template date and spend threshold when `auto_delete` is omitted, without adopting date management.
+16. Explicitly clear a template date at creation and verify the template spend threshold is not inherited.
+17. Override a template date at creation and verify the template spend threshold is not inherited.
+
+Assertions inspect saved JSON plans, persisted state, remote fixture settings, instance IDs, and API mutation counts. Unchanged applies must have a `no-op` instance plan and make no API mutations; date changes must use `update`, with no replacement. Spend thresholds survive date updates and clearing.
+
+Failure scenarios require a failed CLI apply with the expected diagnostic, the date in the original create payload, exactly one allocation attempt, no update requests, and the expected read/cleanup counts. Every surviving allocation must retain its deadline. The fixture stores its allocation and request counters independently of Terraform state so failed applies cannot hide a surviving instance.
+
+The fixture models the merge/null behavior observed in live API verification, including template creation's whole-object override versus update's field-level merge. Template cases also check persisted state, clean subsequent plans, no post-create updates, and an unchanged source template. They characterize the current loss of template spend inheritance when a date override is supplied; they do not establish that this limitation meets a future spend-preservation requirement.
+
+Template cases require the spend-inheritance warning in creation plan and saved-plan apply output when an override is supplied, and no warning when the object is omitted, on subsequent no-op plans, or on in-place date updates. Unknown-value cases also reference a template: planning warns for a known object with an unknown date, defers the warning for an unknown outer object, and creation apply warns after either resolves.
+
+These tests establish provider/CLI behavior against a fixture. Separate live API probes established the modeled template behavior; these CLI tests themselves make no live calls. Deadline execution and early identity persistence/recovery (issue #4) remain separate validation steps. The sibling API payload tests check exact serialized request bodies independently. `internal/resources/instance/auto_delete_failure_test.go` additionally covers lost/malformed create responses after allocation, cancellation, malformed responses and transport errors during polling/readback, mismatched readback, invalid timeout parsing, and a successful-create control.
+
+## Legacy state compatibility
+
+Five additional scenarios run per CLI using state actually written by the pinned old provider: no remote thresholds, date only, spend only, both thresholds, and an imported instance with both thresholds. Created-instance cases add external thresholds to the fixture after creation, then refresh with the old provider before upgrading.
+
+These schema checks deliberately retain `registry.terraform.io/shadeform/shadeform` in HCL and CLI overrides. The current fixture is built with that historical address for this suite only; the legacy fixture retains the original address. They do not test migration to the fork address.
+
+The test verifies that the old raw state contains neither new field, then switches only the provider executable. It requires a clean plan with refresh disabled, successful refresh-only apply, and a clean normal plan/apply. The resulting state must retain its lineage, schema version, instance ID, and existing configuration fields. `auto_delete` must be null (unmanaged), while `effective_auto_delete_date_threshold` reflects the remote date or null. Upgrade performs no API mutations.
+
+Each case then explicitly clears the date, manages a new date, checks repeated applies, preserves any spend threshold, and destroys the same instance. Historical runs before the fork identity change passed all five cases with Terraform 1.14.4 and OpenTofu 1.13.1. Together with the 17 lifecycle scenarios, those historical runs totaled 44 across both engines; they do not qualify Terraform with the fork identity.
+
+This covers the pre-feature schema at the pinned revision and an unchanged provider source address using local state. It does not establish compatibility with every historical release, provider-address migrations, remote backend migrations, or downgrading new state to the old provider.
+
+## Upstream provider-address migration
+
+Run only the new migration checks with:
+
+```sh
+SHADEFORM_LIFECYCLE=1 go test -buildvcs=false ./tests/lifecycle -run '^TestOpenTofuProviderMigration$' -v -count=1
+```
+
+Two OpenTofu scenarios start with upstream state at `registry.terraform.io/shadeform/shadeform` or `registry.opentofu.org/shadeform/shadeform`. Each installs a locally built old provider package labeled 0.1.3, creates the instance with the pinned old implementation, adds external date/spend thresholds, and refreshes using that implementation. Old state is never synthesized by removing new fields.
+
+The scenarios discover the full source in raw state and run `state replace-provider` to `registry.opentofu.org/servescale/shadeform`. They assert that only the provider reference changes: state lineage, resource count, schema version, and existing attributes survive, the lock file is untouched, and the command makes no API calls.
+
+After updating HCL, normal `init` installs the local fork package labeled 0.2.0. A filesystem mirror is the only installation method; there are no development overrides or direct registry fallback. Tests check that configuration and state select the fork, the CLI reports version 0.2.0, the new lock block has its own checksum, and the old block is removed. Readonly initialization preserves the lock file; substituting a different binary under the fork address must fail checksum verification.
+
+The upgraded state decodes without refresh and a subsequent refresh/no-op apply preserves the instance ID, configuration, and remote thresholds without API mutations. The tests then set and clear the date in place, preserving the spend threshold, checking repeat applies and exact mutation counts, and destroy the same instance.
+
+These are two additional scenarios beyond the 22 lifecycle/schema cases. They validate the [migration procedure](../../docs/migration.md) with local state and fixture packages. They do not validate a published signed distribution, remote backends, or downgrades; registry installation remains on the release checklist.

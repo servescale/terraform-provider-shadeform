@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased — proposed fork v0.2.0
+
+This independent servescale release is pending publication and OpenTofu registry registration. Its address is `registry.opentofu.org/servescale/shadeform`. The upstream baseline is v0.1.3 (`c5e5295741be0c0859dee5e3a51dd14b6ea61717`); the v0.1.x entries below describe upstream history. See the [release checklist](docs/releases.md) for outstanding distribution requirements.
+
+### Added
+
+- Independent servescale provider identity `registry.opentofu.org/servescale/shadeform`, with installation instructions and a pending v0.2.0 release checklist.
+- Upstream-to-fork state migration instructions and OpenTofu tests for both upstream registry hostnames, including local package installation, lock-file verification, and same-instance date updates with spend preservation.
+- Optional instance `auto_delete.date_threshold` management: set a date at creation, update it in place, or explicitly clear it. Date updates on an existing instance preserve spend thresholds. At creation, supplying the object overrides the template's whole auto-delete object, including its inherited spend threshold. Omitting the object leaves remote dates unchanged and inherits template thresholds at creation.
+- Read-only `effective_auto_delete_date_threshold` for inspecting managed and unmanaged dates.
+- Terraform/OpenTofu creation warnings when `template_id` and `auto_delete` are supplied together, explaining that the template's spend threshold is not inherited.
+
+### Fixed
+
+- Refresh recognizes instances deleted automatically or externally through HTTP 404 or `status: deleted`.
+- Instance updates populate computed fields from readback instead of leaving them unknown. Numeric SSH ports and hourly prices are decoded from JSON responses.
+
 ## v0.1.0
 
 ### Added
