@@ -40,10 +40,13 @@ decision.
    explicitly enables the race-enabled OpenTofu lifecycle/schema/migration suite,
    and validates the GoReleaser configuration. Full Git history is fetched for the
    pinned legacy-provider tests. The CI matrix pins published OpenTofu releases
-   1.13.1 and 1.13.9; GoReleaser is pinned to v2.20.2 and Go is selected from
-   `go.mod`.
-3. Verify packaging in an isolated clean checkout using GoReleaser v2.20.2. A
-   snapshot build exercises packaging without signing or publishing:
+   1.13.1 and 1.13.9; GoReleaser is pinned to v2.20.2 and both workflows pin
+   Go 1.26.11 for validation and release builds. Keep these compiler pins aligned
+   and update them to patched, supported Go releases. The `go.mod` directive
+   declares the minimum source-build version separately.
+3. Verify packaging in an isolated clean checkout using Go 1.26.11 and
+   GoReleaser v2.20.2. A snapshot build exercises packaging without signing or
+   publishing:
 
    ```sh
    goreleaser check

@@ -22,7 +22,7 @@ go test -buildvcs=false ./tests/lifecycle -v -count=1
 Without `SHADEFORM_LIFECYCLE=1`, the suite is skipped. When enabled, having no available CLI is an error. Explicit executable paths must exist. Versions are logged.
 
 The 22 lifecycle/schema scenarios and two migration scenarios passed with race
-detection on OpenTofu 1.13.9 and Go 1.25.0 on Linux amd64. The
+detection on OpenTofu 1.13.1 and 1.13.9 with Go 1.26.11 on Linux amd64. The
 [Checks workflow](../../.github/workflows/checks.yml) runs this suite with published
 OpenTofu versions 1.13.1 and 1.13.9. Earlier local runs also passed with OpenTofu
 1.13.5. The reviewer independently passed all 24 scenarios with race detection on

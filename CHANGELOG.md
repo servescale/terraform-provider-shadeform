@@ -26,6 +26,7 @@ This is the first independent servescale release, using `registry.opentofu.org/s
 
 - Validate dependency files, Go packages, the race-enabled OpenTofu lifecycle suite, and release configuration on pull requests and before publishing tags.
 - Pin GitHub Actions by commit SHA and GoReleaser to v2.20.2; keep release builds from modifying dependency files and ignore generated distribution output.
+- Pin validation and release builds to patched, supported Go 1.26.11, separately from the module's minimum Go version.
 
 ### Compatibility and known limitations
 
