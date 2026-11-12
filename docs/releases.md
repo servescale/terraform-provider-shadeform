@@ -39,8 +39,9 @@ decision.
    workflow. It checks dependency files without modifying them, runs `go vet`,
    explicitly enables the race-enabled OpenTofu lifecycle/schema/migration suite,
    and validates the GoReleaser configuration. Full Git history is fetched for the
-   pinned legacy-provider tests. OpenTofu is pinned to 1.13.5 and GoReleaser to
-   v2.20.2; Go is selected from `go.mod`.
+   pinned legacy-provider tests. The CI matrix pins published OpenTofu releases
+   1.13.1 and 1.13.9; GoReleaser is pinned to v2.20.2 and Go is selected from
+   `go.mod`.
 3. Verify packaging in an isolated clean checkout using GoReleaser v2.20.2. A
    snapshot build exercises packaging without signing or publishing:
 

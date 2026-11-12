@@ -14,6 +14,10 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        tofu-version: ['1.13.1', '1.13.9']
     steps:
       - name: Check out repository and legacy test baseline
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,8 +31,9 @@ jobs:
       - name: Set up OpenTofu
         uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
-          tofu_version: 1.13.5
+          tofu_version: ${{ matrix.tofu-version }}
           tofu_wrapper: false
+          github_token: ${{ github.token }}
       - name: Check dependency files
         run: go mod tidy -diff
       - name: Vet Go packages
