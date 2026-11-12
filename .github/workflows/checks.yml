@@ -1,0 +1,53 @@
+name: Checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        tofu-version: ['1.13.1', '1.13.9']
+    steps:
+      - name: Check out repository and legacy test baseline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.11'
+          cache: true
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ matrix.tofu-version }}
+          tofu_wrapper: false
+          github_token: ${{ github.token }}
+      - name: Check dependency files
+        run: go mod tidy -diff
+      - name: Vet Go packages
+        run: go vet ./...
+      - name: Run race-enabled tests and OpenTofu lifecycle suite
+        env:
+          SHADEFORM_LIFECYCLE: '1'
+        run: go test -race -buildvcs=false ./... -count=1
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          version: v2.20.2
+          install-only: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check release configuration
+        run: goreleaser check

@@ -13,8 +13,8 @@ For more information, see our [public docs](https://docs.shadeform.ai/guides/att
 
 ## Example Usage
 
-This example targets the proposed fork release v0.2.0, pending publication.
-See the [distribution status](../releases.md).
+This example uses the v0.2.x fork release series.
+See [available versions](https://search.opentofu.org/provider/servescale/shadeform/latest).
 
 ```terraform
 terraform {
