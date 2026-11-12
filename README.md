@@ -104,10 +104,10 @@ At creation, supplying `auto_delete` replaces the template's whole auto-delete o
 
 | Name | Version |
 |------|---------|
-| OpenTofu | Tested with 1.13.1 and 1.13.5 on Linux amd64 |
+| OpenTofu | Tested with 1.13.1 and 1.13.9 on Linux amd64 |
 | go (building from source) | >= 1.25 |
 
-Use a tested OpenTofu version for this release. These runs do not establish a minimum supported version or compatibility with untested versions. All 24 lifecycle/schema/migration scenarios passed with the fork identity on OpenTofu 1.13.1 and 1.13.5; see the [validation details](tests/lifecycle/README.md). Terraform 1.14.4 results predate the identity change and are historical; Terraform has not been validated with the fork identity.
+Use a tested OpenTofu version for this release. These runs do not establish a minimum supported version or compatibility with untested versions. All 24 lifecycle/schema/migration scenarios passed with the fork identity on OpenTofu 1.13.1 and 1.13.9; see the [validation details](tests/lifecycle/README.md). Terraform 1.14.4 results predate the identity change and are historical; Terraform has not been validated with the fork identity.
 
 ## Contributing
 

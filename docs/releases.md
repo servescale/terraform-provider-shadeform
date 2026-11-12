@@ -161,7 +161,7 @@ OpenTofu defaults `servescale/shadeform` to `registry.opentofu.org/servescale/sh
 Use the fully qualified source in configurations shared with Terraform. See
 [OpenTofu provider source addresses](https://opentofu.org/docs/language/providers/requirements/#source-addresses).
 
-OpenTofu 1.13.1 and 1.13.5 have passed all 24 lifecycle/schema/migration scenarios
+OpenTofu 1.13.1 and 1.13.9 have passed all 24 lifecycle/schema/migration scenarios
 on Linux amd64. These versions do not establish a minimum supported range.
 Terraform results before the fork identity change are historical; Terraform has
 not been validated with this fork identity.

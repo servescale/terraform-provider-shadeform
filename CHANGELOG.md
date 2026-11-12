@@ -29,7 +29,7 @@ This is the first independent servescale release, using `registry.opentofu.org/s
 
 ### Compatibility and known limitations
 
-- Tested with OpenTofu 1.13.1 and 1.13.5 on Linux amd64. These results do not establish a minimum supported version. Terraform has not been validated with the fork provider identity.
+- Tested with OpenTofu 1.13.1 and 1.13.9 on Linux amd64. These results do not establish a minimum supported version. Terraform has not been validated with the fork provider identity.
 - Existing upstream state requires the documented [provider-address migration](docs/migration.md).
 - Failed creation can leave an allocated instance outside state; automatic deletion dates limit its lifetime when configured, but do not implement recovery ([issue #4](https://github.com/servescale/terraform-provider-shadeform/issues/4)).
 - Creation-only instance settings do not yet consistently require replacement when changed ([issue #5](https://github.com/servescale/terraform-provider-shadeform/issues/5)).
