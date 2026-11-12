@@ -93,4 +93,4 @@ After updating HCL, normal `init` installs the local fork package labeled 0.2.0.
 
 The upgraded state decodes without refresh and a subsequent refresh/no-op apply preserves the instance ID, configuration, and remote thresholds without API mutations. The tests then set and clear the date in place, preserving the spend threshold, checking repeat applies and exact mutation counts, and destroy the same instance.
 
-These are two additional scenarios beyond the 22 lifecycle/schema cases. They validate the [migration procedure](../../docs/migration.md) with local state and fixture packages. They do not validate a published signed distribution, remote backends, or downgrades; registry installation remains on the release checklist.
+These are two additional scenarios beyond the 22 lifecycle/schema cases. They validate the [migration procedure](../../docs/migration.md) with local state and fixture packages. They do not validate a published signed distribution, remote backends, or downgrades; registry installation is verified separately during the [release procedure](../../docs/releases.md).

@@ -1,8 +1,9 @@
 # Migrate upstream state to the servescale provider
 
-Use this procedure **after the reviewed fork release is published and installable**.
-The proposed first release, v0.2.0, is still pending; see the
-[distribution status](releases.md). The procedure changes provider ownership in
+Use this procedure with a reviewed, installable fork release. Check
+[available registry versions](https://search.opentofu.org/provider/servescale/shadeform/latest)
+and [signed GitHub releases](https://github.com/servescale/terraform-provider-shadeform/releases).
+The procedure changes provider ownership in
 state without recreating the instance. It is separate from enabling date management.
 
 ## Identify the current provider
@@ -145,4 +146,4 @@ represent 0.1.3 and 0.2.0; they are not published release artifacts.
 
 The test does not validate registry registration, signed release installation,
 remote backends, every historical provider version, or downgrades. Published
-distribution verification remains on the [release checklist](releases.md).
+distribution verification is part of the [release procedure](releases.md).

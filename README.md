@@ -1,19 +1,19 @@
 # servescale Shadeform Provider
 
-[![Distribution: pending](https://img.shields.io/badge/OpenTofu_distribution-pending-orange.svg)](docs/releases.md)
+[![GitHub release](https://img.shields.io/github/v/release/servescale/terraform-provider-shadeform)](https://github.com/servescale/terraform-provider-shadeform/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Terraform/OpenTofu provider for managing GPU instances and storage volumes on Shadeform, a unified platform for deploying and managing cloud GPUs across multiple cloud providers. For more information about Shadeform, visit the [Shadeform public docs](https://docs.shadeform.ai/getting-started/introduction).
 
 This is an independently maintained servescale fork for OpenTofu, based on upstream [v0.1.3](https://github.com/shadeform/terraform-provider-shadeform/tree/v0.1.3) (`c5e5295741be0c0859dee5e3a51dd14b6ea61717`). Its provider address is `registry.opentofu.org/servescale/shadeform`. Fork versions follow independent SemVer; matching an upstream version does not imply identical code or compatibility. Upstream contribution remains an option; this fork has no planned retirement date.
 
-**Distribution is pending.** The proposed first fork release is `v0.2.0`; the configuration below becomes installable only after signed release artifacts are published and OpenTofu registry registration is approved. See the [release and distribution checklist](docs/releases.md). The release and published-distribution verification requirements in [issue #3](https://github.com/servescale/terraform-provider-shadeform/issues/3) remain outstanding.
+Available versions are listed in the [OpenTofu registry](https://search.opentofu.org/provider/servescale/shadeform/latest) and [GitHub Releases](https://github.com/servescale/terraform-provider-shadeform/releases). Maintainers can follow the [release procedure](docs/releases.md).
 
 ## Quick Start
 
 ### Installation
 
-After publication, add the provider to your OpenTofu configuration:
+Add the provider to your OpenTofu configuration:
 
 ```hcl
 terraform {
@@ -49,7 +49,7 @@ If you do that, make sure to set the `api_key` to `""`
 #### Commands
 
 ```bash
-# Initialize OpenTofu after publication
+# Initialize OpenTofu
 tofu init
 
 # Plan the changes
@@ -110,6 +110,10 @@ At creation, supplying `auto_delete` replaces the template's whole auto-delete o
 Use a tested OpenTofu version for this release. These runs do not establish a minimum supported version or compatibility with untested versions. All 24 lifecycle/schema/migration scenarios passed with the fork identity on OpenTofu 1.13.1 and 1.13.5; see the [validation details](tests/lifecycle/README.md). Terraform 1.14.4 results predate the identity change and are historical; Terraform has not been validated with the fork identity.
 
 ## Contributing
+
+Pull requests run dependency checks, `go vet`, the race-enabled OpenTofu lifecycle
+suite, and GoReleaser validation in [GitHub Actions](.github/workflows/checks.yml).
+The release workflow runs the same checks before signing and publishing.
 
 1. Fork the repository
 2. Create a feature branch
